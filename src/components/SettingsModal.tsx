@@ -118,9 +118,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     sound.playClick();
                     onUpdateSettings({ graphicsQuality: q });
                   }}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold capitalize border transition-all cursor-pointer ${
+                  className={`min-h-[44px] py-2 px-3 rounded-xl text-xs font-bold capitalize border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
                     settings.graphicsQuality === q
-                      ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
+                      ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md font-black'
                       : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                   }`}
                 >
@@ -133,10 +133,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Camera Controls */}
           <div className="space-y-4">
             <div className="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-              <MousePointer className="w-4 h-4" /> Camera Controls
+              <MousePointer className="w-4 h-4" /> Camera & Movement Controls
             </div>
 
-            {/* Sensitivity */}
+            {/* Camera Sensitivity */}
             <div className="space-y-1">
               <div className="flex justify-between text-xs font-semibold text-slate-300">
                 <span>Camera Orbit Sensitivity</span>
@@ -149,6 +149,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 step="0.1"
                 value={settings.mouseSensitivity}
                 onChange={(e) => onUpdateSettings({ mouseSensitivity: parseFloat(e.target.value) })}
+                className="w-full accent-amber-500 cursor-pointer"
+              />
+            </div>
+
+            {/* Virtual Joystick Sensitivity */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs font-semibold text-slate-300">
+                <span>Virtual Joystick Sensitivity</span>
+                <span className="font-mono text-amber-400">{(settings.joystickSensitivity ?? 1.0).toFixed(1)}x</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="2.5"
+                step="0.1"
+                value={settings.joystickSensitivity ?? 1.0}
+                onChange={(e) => onUpdateSettings({ joystickSensitivity: parseFloat(e.target.value) })}
                 className="w-full accent-amber-500 cursor-pointer"
               />
             </div>
@@ -198,9 +215,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       sound.playClick();
                       onUpdateSettings({ timeOfDay: t, autoDayNight: false });
                     }}
-                    className={`py-1.5 px-2 rounded-xl text-[11px] font-bold capitalize border transition-all cursor-pointer ${
+                    className={`min-h-[44px] py-1.5 px-2 rounded-xl text-[11px] font-bold capitalize border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
                       settings.timeOfDay === t && !settings.autoDayNight
-                        ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md'
+                        ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-md font-black'
                         : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                     }`}
                   >
@@ -221,9 +238,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       sound.playClick();
                       onUpdateSettings({ weather: w });
                     }}
-                    className={`py-1.5 px-2 rounded-xl text-[11px] font-bold capitalize border transition-all cursor-pointer ${
+                    className={`min-h-[44px] py-1.5 px-2 rounded-xl text-[11px] font-bold capitalize border transition-all cursor-pointer flex items-center justify-center active:scale-95 ${
                       settings.weather === w
-                        ? 'bg-sky-500 text-slate-950 border-sky-300 shadow-md'
+                        ? 'bg-sky-500 text-slate-950 border-sky-300 shadow-md font-black'
                         : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
                     }`}
                   >
@@ -316,6 +333,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <span>Run Collision Audit Test Suite</span>
             </button>
 
+            <button
+              onClick={async () => {
+                sound.playClick();
+                if (typeof (window as any).__verifyIndexedDB === 'function') {
+                  const res = await (window as any).__verifyIndexedDB();
+                  const converted: PhysicsTestResult[] = Object.entries(res.stores).map(([storeName, passed]) => ({
+                    testName: `IndexedDB Store: ${storeName}`,
+                    passed: passed as boolean,
+                    details: res.details.find((d: string) => d.includes(storeName)) || (passed ? 'Store verified' : 'Store check failed'),
+                  }));
+                  setAuditResults(converted);
+                } else {
+                  alert('IndexedDB diagnostics not available in this build.');
+                }
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-slate-950 hover:bg-slate-800 text-amber-400 hover:text-amber-300 font-bold text-xs border border-amber-500/40 flex items-center justify-center gap-2 transition-all shadow cursor-pointer active:scale-98"
+            >
+              <Save className="w-4 h-4 text-amber-400" />
+              <span>Verify Offline IndexedDB Stores</span>
+            </button>
+
             {/* Scrollable Audit Log Overlay */}
             {auditResults && (
               <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 space-y-2 max-h-56 overflow-y-auto font-mono text-xs">
@@ -370,14 +408,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-3">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-3">
           {onSaveProgress ? (
             <button
               onClick={() => {
                 sound.playClick();
                 onSaveProgress();
               }}
-              className="py-2 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/40 flex items-center gap-2 transition-all cursor-pointer shadow active:scale-95"
+              className="min-h-[44px] py-2.5 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/40 flex items-center gap-2 transition-all cursor-pointer shadow active:scale-95"
             >
               <Save className="w-4 h-4 text-amber-400" />
               <span>Save Progress</span>
@@ -389,7 +427,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               sound.playClick();
               onClose();
             }}
-            className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            className="min-h-[44px] px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer active:scale-95 flex items-center justify-center"
           >
             Done
           </button>

@@ -34,6 +34,7 @@ interface GameHUDProps {
   tutorialNotice: { title: string; text: string } | null;
   onDismissTutorial: () => void;
   onOpenSettings: () => void;
+  onOpenPause?: () => void;
   onReturnToMenu: () => void;
   isMuted: boolean;
   onToggleMute: () => void;
@@ -56,6 +57,14 @@ interface GameHUDProps {
   maxPlayerHealth?: number;
   ammoCount?: number;
   maxAmmo?: number;
+  getPerformanceStats?: () => {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    textures: number;
+    usedHeapMB: number | null;
+    totalHeapMB: number | null;
+  } | undefined;
 }
 
 export const GameHUD: React.FC<GameHUDProps> = ({
@@ -64,6 +73,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   tutorialNotice,
   onDismissTutorial,
   onOpenSettings,
+  onOpenPause,
   onReturnToMenu,
   isMuted,
   onToggleMute,
@@ -85,6 +95,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   maxPlayerHealth = 100,
   ammoCount = 0,
   maxAmmo = 0,
+  getPerformanceStats,
 }) => {
   const [isQuestDetailsOpen, setIsQuestDetailsOpen] = useState(false);
   const [isEnvPanelOpen, setIsEnvPanelOpen] = useState(false);
@@ -223,7 +234,11 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       {/* ======================================================== */}
       <div
         className="absolute top-0 left-0 right-0 pointer-events-auto flex flex-col gap-1.5 p-2 sm:p-3"
-        style={{ paddingTop: 'max(8px, env(safe-area-inset-top, 8px))' }}
+        style={{
+          paddingTop: 'max(8px, env(safe-area-inset-top, 8px))',
+          paddingLeft: 'max(8px, env(safe-area-inset-left, 8px))',
+          paddingRight: 'max(8px, env(safe-area-inset-right, 8px))',
+        }}
       >
         <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 max-w-7xl mx-auto w-full">
           {/* Left: Compact Quest Tracker Pill */}
@@ -318,112 +333,50 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             )}
           </div>
 
-          {/* Center: Phase 7 Combat Status & Mission Progress */}
-          <div className="flex flex-col items-center gap-1.5 sm:gap-2 mx-auto">
-            {/* Top Row: Vitals (Health & Ammo) */}
-            <div className="flex items-center gap-3 sm:gap-6 bg-slate-950/90 border border-slate-700/60 px-3 sm:px-5 py-1 sm:py-1.5 rounded-full shadow-2xl backdrop-blur-md">
-              {/* Player Health Bar */}
-              <div className="flex items-center gap-2">
-                <Heart 
-                  className={`w-3.5 h-3.5 sm:w-4 h-4 ${playerHealth < 30 ? 'text-red-500 animate-pulse' : 'text-red-400'}`} 
-                  fill={playerHealth < 30 ? 'none' : 'currentColor'} 
+          {/* Center: Vitals (Health & Ammo) */}
+          <div className="flex items-center gap-2 sm:gap-4 bg-slate-950/90 border border-slate-700/60 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-xl backdrop-blur-md shrink-0">
+            {/* Player Health Bar */}
+            <div className="flex items-center gap-1.5 xs:gap-2">
+              <Heart 
+                className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${playerHealth < 30 ? 'text-red-500 animate-pulse' : 'text-red-400'}`} 
+                fill={playerHealth < 30 ? 'none' : 'currentColor'} 
+              />
+              <div className="w-14 xs:w-20 sm:w-28 h-1.5 sm:h-2 bg-slate-900 rounded-full border border-white/5 overflow-hidden relative shadow-inner">
+                <div 
+                  className={`h-full transition-all duration-500 ease-out ${
+                    playerHealth < 30 ? 'bg-gradient-to-r from-red-600 to-red-400 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-gradient-to-r from-emerald-500 to-red-500'
+                  }`}
+                  style={{ width: `${Math.max(0, Math.min(100, (playerHealth / maxPlayerHealth) * 100))}%` }} 
                 />
-                <div className="w-16 sm:w-28 h-1.5 sm:h-2 bg-slate-900 rounded-full border border-white/5 overflow-hidden relative shadow-inner">
-                  <div 
-                    className={`h-full transition-all duration-500 ease-out ${
-                      playerHealth < 30 ? 'bg-gradient-to-r from-red-600 to-red-400 shadow-[0_0_8px_rgba(239,68,68,0.4)]' : 'bg-gradient-to-r from-emerald-500 to-red-500'
-                    }`}
-                    style={{ width: `${Math.max(0, Math.min(100, (playerHealth / maxPlayerHealth) * 100))}%` }} 
-                  />
+              </div>
+              <span className="text-[10px] sm:text-xs font-black text-slate-100 tabular-nums min-w-[18px]">
+                {Math.ceil(playerHealth)}
+              </span>
+            </div>
+
+            {/* Firearm Ammunition (Authorized Missions Only) */}
+            {quest.firearmAuthorized && (
+              <div className="flex items-center gap-1.5 border-l border-white/10 pl-2 sm:pl-3">
+                <Crosshair className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+                <div className="flex items-end gap-0.5">
+                  <span className="text-xs sm:text-sm font-black text-amber-400 tabular-nums leading-none">
+                    {ammoCount}
+                  </span>
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 leading-none mb-0.5">
+                    /{maxAmmo}
+                  </span>
                 </div>
-                <span className="text-[10px] sm:text-xs font-black text-slate-100 tabular-nums min-w-[20px]">
-                  {Math.ceil(playerHealth)}
-                </span>
               </div>
-
-              {/* Firearm Ammunition (Authorized Missions Only) */}
-              {quest.firearmAuthorized && (
-                <div className="flex items-center gap-2 border-l border-white/10 pl-3 sm:pl-6">
-                  <Crosshair className="w-3.5 h-3.5 sm:w-4 h-4 text-amber-400" />
-                  <div className="flex items-end gap-0.5">
-                    <span className="text-xs sm:text-sm font-black text-amber-400 tabular-nums leading-none">
-                      {ammoCount}
-                    </span>
-                    <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 leading-none mb-0.5">
-                      / {maxAmmo}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-1 sm:gap-2">
-            <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-950/80 border border-slate-800/80 rounded-xl px-1.5 py-1 sm:px-2.5 sm:py-1.5 shadow-lg">
-              {/* Sun Key */}
-              <div
-                className={`flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold border transition-all ${
-                  quest.keysCollected.sun
-                    ? 'bg-amber-500/25 text-amber-300 border-amber-400/70 shadow-sm'
-                    : 'bg-slate-900/40 text-slate-500 border-slate-800'
-                }`}
-                title="Sun Key (Sun Temple Ruins)"
-              >
-                <Sun className={`w-3.5 h-3.5 ${quest.keysCollected.sun ? 'text-amber-400 fill-amber-400/40' : ''}`} />
-                <span className="hidden xs:inline">Sun</span>
-                {quest.keysCollected.sun && <Check className="w-3 h-3 text-amber-300 ml-0.5" />}
-              </div>
-
-              {/* Ocean Key */}
-              <div
-                className={`flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold border transition-all ${
-                  quest.keysCollected.ocean
-                    ? 'bg-sky-500/25 text-sky-300 border-sky-400/70 shadow-sm'
-                    : 'bg-slate-900/40 text-slate-500 border-slate-800'
-                }`}
-                title="Ocean Key (Waterfall Grotto)"
-              >
-                <Droplets className={`w-3.5 h-3.5 ${quest.keysCollected.ocean ? 'text-sky-400 fill-sky-400/40' : ''}`} />
-                <span className="hidden xs:inline">Ocean</span>
-                {quest.keysCollected.ocean && <Check className="w-3 h-3 text-sky-300 ml-0.5" />}
-              </div>
-
-              {/* Forest Key */}
-              <div
-                className={`flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-lg text-[10px] sm:text-xs font-bold border transition-all ${
-                  quest.keysCollected.forest
-                    ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/70 shadow-sm'
-                    : 'bg-slate-900/40 text-slate-500 border-slate-800'
-                }`}
-                title="Forest Key (Sacred Grove)"
-              >
-                <Trees className={`w-3.5 h-3.5 ${quest.keysCollected.forest ? 'text-emerald-400 fill-emerald-400/40' : ''}`} />
-                <span className="hidden xs:inline">Forest</span>
-                {quest.keysCollected.forest && <Check className="w-3 h-3 text-emerald-300 ml-0.5" />}
-              </div>
-            </div>
-
-            {/* Treasure Coins & Chests Badge */}
-            <div className="hidden xs:flex items-center gap-2 bg-slate-950/85 border border-amber-500/30 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 shadow text-xs font-bold">
-              <div className="flex items-center gap-1 text-amber-300" title="Ancient Coins Collected">
-                <Coins className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-mono">{quest.coinsCollected}</span>
-              </div>
-              <span className="text-slate-600">|</span>
-              <div className="flex items-center gap-1 text-slate-300" title="Hidden Chests Opened">
-                <Package className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-mono">{quest.chestsOpened}/{quest.totalChests}</span>
-              </div>
-            </div>
-            </div>
+            )}
           </div>
 
-          {/* Right: Compass & Action Icons */}
-          <div className="flex items-center gap-1 sm:gap-1.5">
+          {/* Right: Quick Action Controls */}
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             {/* Environment Control Button */}
             <div className="relative">
               <button
                 onClick={() => setIsEnvPanelOpen(!isEnvPanelOpen)}
-                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow ${
+                className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow active:scale-95 ${
                   isEnvPanelOpen
                     ? 'bg-amber-500 text-slate-950 border-amber-300'
                     : 'bg-slate-900/90 hover:bg-slate-800 text-amber-400 border-slate-700/80'
@@ -444,14 +397,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
               {/* Environment Quick Controls Dropdown */}
               {isEnvPanelOpen && (
-                <div className="absolute top-full right-0 mt-1.5 w-64 bg-slate-950/95 border border-amber-500/40 rounded-2xl p-3 shadow-2xl z-50 text-xs space-y-2.5 animate-in fade-in duration-150">
+                <div className="absolute top-full right-0 mt-1.5 w-60 sm:w-64 bg-slate-950/95 border border-amber-500/40 rounded-2xl p-3 shadow-2xl z-50 text-xs space-y-2.5 animate-in fade-in duration-150">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 text-amber-400 font-extrabold uppercase tracking-wider text-[10px]">
                     <span className="flex items-center gap-1">
-                      <Cloud className="w-3.5 h-3.5" /> Environment Controls
+                      <Cloud className="w-3.5 h-3.5" /> Environment
                     </span>
                     <button
                       onClick={() => setIsEnvPanelOpen(false)}
-                      className="text-slate-400 hover:text-white"
+                      className="text-slate-400 hover:text-white p-1"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -503,7 +456,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
                   {/* Auto Day/Night Cycle Toggle */}
                   <div className="flex items-center justify-between bg-slate-900/80 p-2 rounded-xl border border-slate-800">
-                    <span className="text-[11px] font-bold text-slate-300">Auto Day & Night</span>
+                    <span className="text-[11px] font-bold text-slate-300">Auto Cycle</span>
                     <button
                       onClick={onToggleAutoCycle}
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase transition-colors ${
@@ -522,47 +475,104 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             {/* Inventory Satchel Button */}
             <button
               onClick={onOpenInventory}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow active:scale-95"
               title="Open Satchel Inventory"
+              aria-label="Satchel"
             >
               <Briefcase className="w-4 h-4" />
-            </button>
-
-            {/* Achievements Trophy Button */}
-            <button
-              onClick={onOpenAchievements}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-yellow-300 hover:text-yellow-200 border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow"
-              title="Open Achievements"
-            >
-              <Trophy className="w-4 h-4" />
             </button>
 
             {/* Audio Toggle */}
             <button
               onClick={onToggleMute}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow active:scale-95"
               aria-label={isMuted ? 'Unmute Audio' : 'Mute Audio'}
             >
               {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4 text-amber-400" />}
             </button>
 
-            {/* Settings */}
+            {/* Pause / Settings Menu Button */}
             <button
-              onClick={onOpenSettings}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow"
-              aria-label="Settings"
+              onClick={() => {
+                if (onOpenPause) onOpenPause();
+                else onOpenSettings();
+              }}
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-400 hover:text-amber-300 border border-amber-500/40 flex items-center justify-center transition-colors cursor-pointer shadow active:scale-95"
+              aria-label="Pause Menu"
+              title="Pause Game"
             >
               <Settings className="w-4 h-4" />
             </button>
 
-            {/* Menu */}
+            {/* Desktop-only secondary buttons */}
+            <button
+              onClick={onOpenAchievements}
+              className="hidden md:flex w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-yellow-300 hover:text-yellow-200 border border-slate-700/80 items-center justify-center transition-colors cursor-pointer shadow"
+              title="Open Achievements"
+            >
+              <Trophy className="w-4 h-4" />
+            </button>
+
             <button
               onClick={onReturnToMenu}
-              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 flex items-center justify-center transition-colors cursor-pointer shadow"
+              className="hidden md:flex w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 items-center justify-center transition-colors cursor-pointer shadow"
               aria-label="Return to Main Menu"
             >
               <Home className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+
+        {/* Tier 2 Sub-Deck: 3 Elemental Key Badges & Treasure Coins */}
+        <div className="flex items-center justify-center gap-2 max-w-xl mx-auto w-full pt-0.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-950/80 border border-slate-800/80 rounded-xl px-2 py-0.5 sm:px-2.5 sm:py-1 shadow-lg">
+            {/* Sun Key */}
+            <div
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] xs:text-[10px] sm:text-xs font-bold border transition-all ${
+                quest.keysCollected.sun
+                  ? 'bg-amber-500/25 text-amber-300 border-amber-400/70 shadow-sm'
+                  : 'bg-slate-900/40 text-slate-500 border-slate-800'
+              }`}
+              title="Sun Key (Sun Temple Ruins)"
+            >
+              <Sun className={`w-3 h-3 xs:w-3.5 xs:h-3.5 ${quest.keysCollected.sun ? 'text-amber-400 fill-amber-400/40' : ''}`} />
+              <span className="hidden xs:inline">Sun</span>
+              {quest.keysCollected.sun && <Check className="w-2.5 h-2.5 text-amber-300 ml-0.5" />}
+            </div>
+
+            {/* Ocean Key */}
+            <div
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] xs:text-[10px] sm:text-xs font-bold border transition-all ${
+                quest.keysCollected.ocean
+                  ? 'bg-sky-500/25 text-sky-300 border-sky-400/70 shadow-sm'
+                  : 'bg-slate-900/40 text-slate-500 border-slate-800'
+              }`}
+              title="Ocean Key (Waterfall Grotto)"
+            >
+              <Droplets className={`w-3 h-3 xs:w-3.5 xs:h-3.5 ${quest.keysCollected.ocean ? 'text-sky-400 fill-sky-400/40' : ''}`} />
+              <span className="hidden xs:inline">Ocean</span>
+              {quest.keysCollected.ocean && <Check className="w-2.5 h-2.5 text-sky-300 ml-0.5" />}
+            </div>
+
+            {/* Forest Key */}
+            <div
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded-lg text-[9px] xs:text-[10px] sm:text-xs font-bold border transition-all ${
+                quest.keysCollected.forest
+                  ? 'bg-emerald-500/25 text-emerald-300 border-emerald-400/70 shadow-sm'
+                  : 'bg-slate-900/40 text-slate-500 border-slate-800'
+              }`}
+              title="Forest Key (Sacred Grove)"
+            >
+              <Trees className={`w-3 h-3 xs:w-3.5 xs:h-3.5 ${quest.keysCollected.forest ? 'text-emerald-400 fill-emerald-400/40' : ''}`} />
+              <span className="hidden xs:inline">Forest</span>
+              {quest.keysCollected.forest && <Check className="w-2.5 h-2.5 text-emerald-300 ml-0.5" />}
+            </div>
+          </div>
+
+          {/* Treasure Coins Badge */}
+          <div className="flex items-center gap-1 bg-slate-950/80 border border-amber-500/30 rounded-xl px-2 py-0.5 sm:px-2.5 sm:py-1 shadow text-[10px] sm:text-xs font-bold text-amber-300">
+            <Coins className="w-3 h-3 text-amber-400" />
+            <span className="font-mono">{quest.coinsCollected}</span>
           </div>
         </div>
       </div>
@@ -642,8 +652,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       {/* Top-Down Island Minimap Radar */}
       <Minimap playerPos={playerPos} quest={quest} />
 
-      {/* Real-time FPS & Frame Time Performance Overlay */}
-      {showFps && <FpsOverlay />}
+      {/* Real-time Dev HUD Performance Overlay */}
+      {showFps && <FpsOverlay getPerformanceStats={getPerformanceStats} />}
     </div>
   );
 };
@@ -800,7 +810,7 @@ const Minimap: React.FC<MinimapProps> = ({ playerPos, quest }) => {
   return (
     <div
       onClick={() => setIsExpanded((prev) => !prev)}
-      className={`fixed top-14 left-2.5 xs:left-3.5 sm:top-16 sm:left-4 z-30 pointer-events-auto cursor-pointer transition-all duration-200 ${
+      className={`fixed top-20 xs:top-22 sm:top-24 left-2.5 xs:left-3.5 sm:left-4 z-30 pointer-events-auto cursor-pointer transition-all duration-200 ${
         isExpanded ? 'scale-125 origin-top-left' : 'hover:scale-105'
       }`}
       title="Top-Down Island Radar Minimap (Click to Expand)"
@@ -816,8 +826,27 @@ const Minimap: React.FC<MinimapProps> = ({ playerPos, quest }) => {
   );
 };
 
-const FpsOverlay: React.FC = () => {
-  const [fpsInfo, setFpsInfo] = React.useState({ fps: 60, frameTime: 16.6 });
+interface DevHudProps {
+  getPerformanceStats?: () => {
+    drawCalls: number;
+    triangles: number;
+    geometries: number;
+    textures: number;
+    usedHeapMB: number | null;
+    totalHeapMB: number | null;
+  } | undefined;
+}
+
+const FpsOverlay: React.FC<DevHudProps> = ({ getPerformanceStats }) => {
+  const [hudInfo, setHudInfo] = React.useState({
+    fps: 60,
+    frameTime: 16.6,
+    drawCalls: 0,
+    triangles: 0,
+    geometries: 0,
+    textures: 0,
+    usedHeapMB: null as number | null,
+  });
 
   React.useEffect(() => {
     let frameCount = 0;
@@ -828,10 +857,19 @@ const FpsOverlay: React.FC = () => {
       const now = performance.now();
       frameCount++;
       const delta = now - lastTime;
-      if (delta >= 500) {
+      if (delta >= 400) {
         const fps = Math.round((frameCount * 1000) / delta);
         const frameTime = parseFloat((delta / frameCount).toFixed(1));
-        setFpsInfo({ fps, frameTime });
+        const stats = getPerformanceStats?.() || { drawCalls: 0, triangles: 0, geometries: 0, textures: 0, usedHeapMB: null };
+        setHudInfo({
+          fps,
+          frameTime,
+          drawCalls: stats.drawCalls,
+          triangles: stats.triangles,
+          geometries: stats.geometries,
+          textures: stats.textures,
+          usedHeapMB: stats.usedHeapMB,
+        });
         frameCount = 0;
         lastTime = now;
       }
@@ -840,14 +878,29 @@ const FpsOverlay: React.FC = () => {
 
     animId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animId);
-  }, []);
+  }, [getPerformanceStats]);
+
+  const trisFormatted = hudInfo.triangles > 1000 
+    ? `${(hudInfo.triangles / 1000).toFixed(1)}k` 
+    : `${hudInfo.triangles}`;
 
   return (
-    <div className="fixed bottom-3 right-3 bg-slate-950/90 border border-emerald-500/50 rounded-xl px-2.5 py-1.5 font-mono text-[11px] text-emerald-400 font-bold shadow-xl z-50 pointer-events-none flex items-center gap-2">
-      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-      <span>{fpsInfo.fps} FPS</span>
-      <span className="text-slate-500">|</span>
-      <span>{fpsInfo.frameTime} ms</span>
+    <div className="fixed bottom-3 right-3 bg-slate-950/95 border border-emerald-500/60 rounded-2xl px-3 py-2 font-mono text-[10px] sm:text-[11px] text-emerald-400 font-bold shadow-2xl z-50 pointer-events-none flex flex-col gap-1 backdrop-blur-md">
+      <div className="flex items-center justify-between gap-3 text-[11px] border-b border-slate-800/80 pb-1">
+        <span className="flex items-center gap-1.5 text-white uppercase font-sans font-black tracking-wider">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" /> DEV HUD
+        </span>
+        <span className="text-emerald-300 font-extrabold">{hudInfo.fps} FPS <span className="text-slate-500 font-normal">({hudInfo.frameTime}ms)</span></span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-slate-300 text-[10px]">
+        <div><span className="text-slate-500">Draw Calls:</span> <span className="text-amber-300 font-mono">{hudInfo.drawCalls}</span></div>
+        <div><span className="text-slate-500">Triangles:</span> <span className="text-amber-300 font-mono">{trisFormatted}</span></div>
+        <div><span className="text-slate-500">Geo/Tex:</span> <span className="text-sky-300 font-mono">{hudInfo.geometries}/{hudInfo.textures}</span></div>
+        {hudInfo.usedHeapMB !== null && (
+          <div><span className="text-slate-500">Heap Mem:</span> <span className="text-purple-300 font-mono">{hudInfo.usedHeapMB} MB</span></div>
+        )}
+      </div>
     </div>
   );
 };

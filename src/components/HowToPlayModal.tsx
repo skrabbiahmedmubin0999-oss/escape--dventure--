@@ -135,13 +135,13 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ onClose }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex justify-end">
+        <div className="px-4 py-3 sm:px-6 sm:py-4 bg-slate-950/80 border-t border-slate-800 flex justify-end shrink-0">
           <button
             onClick={() => {
               sound.playClick();
               onClose();
             }}
-            className="px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            className="w-full xs:w-auto min-h-[46px] px-6 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center active:scale-95"
           >
             Got It!
           </button>

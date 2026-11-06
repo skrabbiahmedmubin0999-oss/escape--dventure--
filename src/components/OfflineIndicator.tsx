@@ -30,13 +30,16 @@ export const OfflineIndicator: React.FC = () => {
   if (isOnline && dismissed) return null;
 
   return (
-    <div className={`fixed top-3 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 font-sans ${!isOnline ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0 pointer-events-none'}`}>
-      <div className="bg-amber-950/90 border-2 border-amber-500/80 text-amber-200 px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-md">
-        <div className="p-1.5 bg-amber-500/20 rounded-xl text-amber-400 animate-pulse">
+    <div 
+      className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-300 font-sans ${!isOnline ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0 pointer-events-none'}`}
+      style={{ top: 'max(10px, env(safe-area-inset-top, 10px))' }}
+    >
+      <div className="bg-amber-950/95 border-2 border-amber-500/80 text-amber-200 px-3.5 py-1.5 xs:px-4 xs:py-2 rounded-2xl shadow-2xl flex items-center gap-2.5 backdrop-blur-md max-w-[92vw]">
+        <div className="p-1.5 bg-amber-500/20 rounded-xl text-amber-400 animate-pulse shrink-0">
           <WifiOff className="w-4 h-4" />
         </div>
-        <div className="text-xs font-bold tracking-wide">
-          <span>Offline Mode Active</span> — Game is running fully offline from cache!
+        <div className="text-[11px] xs:text-xs font-bold tracking-wide truncate">
+          <span>Offline Mode</span> — Running from local cache!
         </div>
       </div>
     </div>

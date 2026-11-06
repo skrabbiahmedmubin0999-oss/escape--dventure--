@@ -1145,11 +1145,14 @@ export class IslandWorld {
   }
 
   public getPerformanceStats() {
+    const memory = (performance as any)?.memory;
     return {
       drawCalls: this.renderer.info.render.calls,
       triangles: this.renderer.info.render.triangles,
       geometries: this.renderer.info.memory.geometries,
       textures: this.renderer.info.memory.textures,
+      usedHeapMB: memory ? Math.round(memory.usedJSHeapSize / (1024 * 1024)) : null,
+      totalHeapMB: memory ? Math.round(memory.totalJSHeapSize / (1024 * 1024)) : null,
     };
   }
 

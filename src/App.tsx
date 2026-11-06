@@ -19,9 +19,13 @@ import { FailureModal } from './components/FailureModal';
 import { MissionSelectModal } from './components/MissionSelectModal';
 import { ShareModal } from './components/ShareModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { MobileHelpOverlay } from './components/MobileHelpOverlay';
+import { PauseModal } from './components/PauseModal';
+import { GameLoadingScreen } from './components/GameLoadingScreen';
 import { MISSION_CONFIGS, getMissionConfig } from './game/levelManifest';
 import { runCollisionTestSuite } from './game/collisionTests';
 import { runGameplayQATestSuite } from './game/gameplayQATests';
+import { offlineStorage } from './game/storage/StorageAdapter';
 
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -30,6 +34,7 @@ const DEFAULT_SETTINGS: GameSettings = {
   musicVolume: 0.5,
   graphicsQuality: 'high',
   mouseSensitivity: 1.0,
+  joystickSensitivity: 1.0,
   invertY: false,
   showFps: false,
 };
@@ -148,6 +153,20 @@ export default function App() {
   const [showMissionSelect, setShowMissionSelect] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showControlCustomizer, setShowControlCustomizer] = useState(false);
+  const [showMobileHelp, setShowMobileHelp] = useState(false);
+  const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [isLoadingScreen, setIsLoadingScreen] = useState(false);
+
+  // Escape key toggles Pause Menu during active gameplay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' && mode === 'playing') {
+        setShowPauseMenu((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mode]);
   const [controlLayout, setControlLayout] = useState<ControlLayoutConfig>(() => {
     try {
       const saved = localStorage.getItem('escape_adventure_controls_layout');
@@ -159,26 +178,22 @@ export default function App() {
 
   const handleSaveControlLayout = (newLayout: ControlLayoutConfig) => {
     setControlLayout(newLayout);
-    try {
-      localStorage.setItem('escape_adventure_controls_layout', JSON.stringify(newLayout));
-      addToast({
-        type: 'achievement',
-        title: 'Controls Updated',
-        message: 'Custom touch control layout saved successfully!',
-      });
-    } catch {}
+    offlineStorage.saveControlLayout(newLayout).catch(() => {});
+    addToast({
+      type: 'achievement',
+      title: 'Controls Updated',
+      message: 'Custom touch control layout saved successfully to IndexedDB!',
+    });
   };
 
   const handleResetControlLayout = () => {
     setControlLayout(DEFAULT_CONTROL_LAYOUT);
-    try {
-      localStorage.removeItem('escape_adventure_controls_layout');
-      addToast({
-        type: 'achievement',
-        title: 'Controls Reset',
-        message: 'Touch control layout restored to default.',
-      });
-    } catch {}
+    offlineStorage.saveControlLayout(DEFAULT_CONTROL_LAYOUT).catch(() => {});
+    addToast({
+      type: 'achievement',
+      title: 'Controls Reset',
+      message: 'Touch control layout restored to default.',
+    });
   };
 
   const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
@@ -197,7 +212,7 @@ export default function App() {
     }, 4500);
   }, []);
 
-  const saveGameProgress = useCallback(() => {
+  const saveGameProgress = useCallback(async () => {
     const currentPos = worldRef.current
       ? {
           x: parseFloat(worldRef.current.playerPos.x.toFixed(2)),
@@ -215,7 +230,7 @@ export default function App() {
     };
 
     try {
-      localStorage.setItem('escape_adventure_saved_game', JSON.stringify(saveData));
+      await offlineStorage.saveSavedGame(saveData);
       addToast({
         type: 'checkpoint',
         title: 'Progress Saved',
@@ -223,7 +238,7 @@ export default function App() {
       });
       sound.playLand();
     } catch (err) {
-      console.error('Failed to save progress to localStorage', err);
+      console.error('Failed to save progress to IndexedDB', err);
     }
   }, [quest, addToast]);
 
@@ -401,20 +416,41 @@ export default function App() {
       }
     }
     sound.setVolumes(settings.sfxVolume, settings.musicVolume, !settings.soundEnabled);
-    try {
-      localStorage.setItem('escape_adventure_settings', JSON.stringify(settings));
-    } catch {}
+    offlineStorage.saveSettings(settings).catch(() => {});
   }, [settings]);
 
-  // Sync customization changes to 3D player
+  // Sync customization changes to 3D player and offlineStorage
   useEffect(() => {
     if (worldRef.current) {
       worldRef.current.setPlayerCustomization(customization.tunicColor, customization.hatColor);
     }
-    try {
-      localStorage.setItem('escape_adventure_profile', JSON.stringify(customization));
-    } catch {}
+    offlineStorage.saveProfile(customization).catch(() => {});
   }, [customization]);
+
+  // Sync player statistics to offlineStorage
+  useEffect(() => {
+    offlineStorage.saveStats(stats).catch(() => {});
+  }, [stats]);
+
+  // Asynchronously initialize offline IndexedDB, migrate legacy localStorage, and hydrate latest saved state
+  useEffect(() => {
+    offlineStorage.init().then(async () => {
+      try {
+        const [savedSettings, savedProfile, savedStats, savedLayout] = await Promise.all([
+          offlineStorage.loadSettings(),
+          offlineStorage.loadProfile(),
+          offlineStorage.loadStats(),
+          offlineStorage.loadControlLayout(),
+        ]);
+        if (savedSettings) setSettings((prev) => ({ ...prev, ...savedSettings }));
+        if (savedProfile) setCustomization((prev) => ({ ...prev, ...savedProfile }));
+        if (savedStats) setStats((prev) => ({ ...prev, ...savedStats }));
+        if (savedLayout) setControlLayout(savedLayout);
+      } catch (err) {
+        console.warn('[Storage] Error hydrating from offlineStorage on startup:', err);
+      }
+    });
+  }, []);
 
   // 2. Keyboard Input Listeners
   useEffect(() => {
@@ -535,7 +571,7 @@ export default function App() {
   };
 
   // Actions
-  const handleStartGame = (withCompanion = false, loadSave = true, newSeed?: number, missionId?: string) => {
+  const handleStartGame = async (withCompanion = false, loadSave = true, newSeed?: number, missionId?: string) => {
     isTutorialDismissedRef.current = false;
     setTutorialNotice(null);
     if (worldRef.current) {
@@ -548,27 +584,24 @@ export default function App() {
 
       if (loadSave) {
         try {
-          const savedStr = localStorage.getItem('escape_adventure_saved_game');
-          if (savedStr) {
-            const savedData = JSON.parse(savedStr);
-            if (savedData.quest && savedData.playerPos) {
-              worldRef.current.restoreSavedProgress(savedData.quest, savedData.playerPos);
-              setQuest(savedData.quest);
-              addToast({
-                type: 'checkpoint',
-                title: 'Checkpoint Loaded',
-                message: `Loaded saved progress at (${savedData.playerPos.x}, ${savedData.playerPos.z})!`,
-              });
-            }
+          const savedData = await offlineStorage.loadSavedGame();
+          if (savedData && savedData.quest && savedData.playerPos) {
+            worldRef.current.restoreSavedProgress(savedData.quest, savedData.playerPos);
+            setQuest(savedData.quest);
+            addToast({
+              type: 'checkpoint',
+              title: 'Checkpoint Loaded',
+              message: `Loaded saved progress at (${savedData.playerPos.x}, ${savedData.playerPos.z})!`,
+            });
           }
         } catch (err) {
-          console.error('Failed to load saved progress', err);
+          console.error('Failed to load saved progress from offline storage', err);
         }
       }
     }
-    setMode('playing');
     setShowMultiplayer(false);
     setShowMissionSelect(false);
+    setIsLoadingScreen(true);
   };
 
   const handleReturnToMenu = () => {
@@ -628,6 +661,7 @@ export default function App() {
               sound.playClick();
             }}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenPause={() => setShowPauseMenu(true)}
             onReturnToMenu={handleReturnToMenu}
             isMuted={!settings.soundEnabled}
             onToggleMute={toggleMute}
@@ -664,13 +698,20 @@ export default function App() {
             maxPlayerHealth={quest.maxPlayerHealth ?? 100}
             ammoCount={quest.ammoCount ?? 0}
             maxAmmo={quest.maxAmmo ?? 0}
+            getPerformanceStats={() => worldRef.current?.getPerformanceStats()}
           />
+
+          {/* Temporary Mobile Touch & Controls Help Overlay */}
+          {showMobileHelp && (
+            <MobileHelpOverlay onDismiss={() => setShowMobileHelp(false)} />
+          )}
 
           {/* Toast Notification Popups */}
           <NotificationToastContainer toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
 
           {/* Mobile Virtual Joystick & Touch Controls */}
           <MobileControls
+            joystickSensitivity={settings.joystickSensitivity ?? 1.0}
             onJoystickMove={(jx, jy) => {
               if (worldRef.current) {
                 worldRef.current.inputs.joystickX = jx;
@@ -800,6 +841,38 @@ export default function App() {
         />
       )}
 
+      {/* Pause Menu Modal */}
+      {showPauseMenu && (
+        <PauseModal
+          isOpen={showPauseMenu}
+          onResume={() => setShowPauseMenu(false)}
+          onRestart={() => {
+            setShowPauseMenu(false);
+            handleStartGame(worldRef.current?.companionActive ?? false, false);
+          }}
+          onReturnToMenu={() => {
+            setShowPauseMenu(false);
+            handleReturnToMenu();
+          }}
+          onOpenSettings={() => {
+            setShowPauseMenu(false);
+            setShowSettings(true);
+          }}
+          onOpenControlCustomizer={() => {
+            setShowPauseMenu(false);
+            setShowControlCustomizer(true);
+          }}
+          onOpenHowToPlay={() => {
+            setShowPauseMenu(false);
+            setShowHowToPlay(true);
+          }}
+          onSaveProgress={saveGameProgress}
+          isMuted={!settings.soundEnabled}
+          onToggleMute={toggleMute}
+          quest={quest}
+        />
+      )}
+
       {/* Settings Modal */}
       {showSettings && (
         <SettingsModal
@@ -852,6 +925,21 @@ export default function App() {
         <ShareModal
           isOpen={showShare}
           onClose={() => setShowShare(false)}
+        />
+      )}
+
+      {/* Game Loading Screen Overlay */}
+      {isLoadingScreen && (
+        <GameLoadingScreen
+          missionTitle={getMissionConfig(quest.currentMissionId).title}
+          missionDescription={getMissionConfig(quest.currentMissionId).description}
+          playerName={customization.name}
+          playerTitle={customization.title}
+          onLoadingComplete={() => {
+            setIsLoadingScreen(false);
+            setMode('playing');
+            setShowMobileHelp(true);
+          }}
         />
       )}
     </div>

@@ -25,8 +25,8 @@ export const FailureModal: React.FC<Props> = ({
   const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto select-none">
-      <div className="relative w-full max-w-md bg-slate-900 border-2 border-red-500/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-slate-100 p-6 sm:p-8 text-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto select-none font-sans">
+      <div className="relative w-full max-w-md bg-slate-900 border-2 border-red-500/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-slate-100 p-5 sm:p-7 text-center max-h-[88dvh] overflow-y-auto custom-scrollbar">
         {/* Top Failure Icon Badge */}
         <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-500/20 border-2 border-red-500/60 text-red-400 flex items-center justify-center shadow-lg shadow-red-500/20 mb-4 animate-bounce">
           <AlertTriangle className="w-9 h-9 sm:w-11 sm:h-11" />
@@ -71,17 +71,17 @@ export const FailureModal: React.FC<Props> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full">
+        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full shrink-0">
           <button
             onClick={onRetry}
-            className="w-full py-3 px-5 rounded-2xl bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
+            className="w-full min-h-[48px] py-3 px-5 rounded-2xl bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
           >
             <RefreshCw className="w-4 h-4" /> Try Again
           </button>
 
           <button
             onClick={onReturnToMenu}
-            className="w-full sm:w-auto py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider border border-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] py-2.5 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider border border-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shrink-0"
           >
             <Home className="w-4 h-4" /> Menu
           </button>

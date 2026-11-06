@@ -145,13 +145,13 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="p-6 pt-0 space-y-2">
+        <div className="p-4 sm:p-6 pt-0 space-y-2 shrink-0">
           <button
             onClick={() => {
               sound.playClick();
               onPlayAgain();
             }}
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="w-full min-h-[48px] py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm uppercase tracking-wider shadow-xl flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
           >
             <RotateCcw className="w-4 h-4" />
             <span>New Expedition</span>
@@ -163,7 +163,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
                 sound.playClick();
                 onReplaySameSeed();
               }}
-              className="w-full py-2.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/30 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full min-h-[44px] py-2.5 px-4 rounded-2xl bg-slate-800/90 hover:bg-slate-700/90 text-amber-300 font-bold text-xs uppercase tracking-wider border border-amber-500/30 transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
               <span>Retry Same Seed (Mastery)</span>
@@ -175,7 +175,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
               sound.playClick();
               onReturnToMenu();
             }}
-            className="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full min-h-[44px] py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-2 cursor-pointer active:scale-95"
           >
             <Home className="w-4 h-4" />
             <span>Main Menu</span>

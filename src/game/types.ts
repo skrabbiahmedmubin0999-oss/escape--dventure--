@@ -50,6 +50,7 @@ export interface GameSettings {
   musicVolume: number;
   graphicsQuality: 'low' | 'medium' | 'high';
   mouseSensitivity: number;
+  joystickSensitivity?: number;
   invertY: boolean;
   showFps: boolean;
   timeOfDay?: TimeOfDay;
