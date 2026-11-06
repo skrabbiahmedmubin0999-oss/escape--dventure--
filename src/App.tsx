@@ -16,6 +16,8 @@ import { InventoryModal } from './components/InventoryModal';
 import { AchievementsModal } from './components/AchievementsModal';
 import { FailureModal } from './components/FailureModal';
 import { MissionSelectModal } from './components/MissionSelectModal';
+import { ShareModal } from './components/ShareModal';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { MISSION_CONFIGS, getMissionConfig } from './game/levelManifest';
 import { runCollisionTestSuite } from './game/collisionTests';
 import { runGameplayQATestSuite } from './game/gameplayQATests';
@@ -143,6 +145,7 @@ export default function App() {
   const [showInventory, setShowInventory] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showMissionSelect, setShowMissionSelect] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
   const [finalTime, setFinalTime] = useState<number>(0);
@@ -554,6 +557,9 @@ export default function App() {
       onPointerCancel={handlePointerUp}
       onWheel={handleWheel}
     >
+      {/* Offline Connectivity Status Indicator */}
+      <OfflineIndicator />
+
       {/* 3D WebGL Canvas Mount Container */}
       <div ref={canvasMountRef} className="absolute inset-0 z-0 cursor-grab active:cursor-grabbing" />
 
@@ -566,6 +572,7 @@ export default function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenProfile={() => setShowProfile(true)}
           onOpenMissionSelect={() => setShowMissionSelect(true)}
+          onOpenShare={() => setShowShare(true)}
           playerName={customization.name}
           playerTitle={customization.title}
           isMuted={!settings.soundEnabled}
@@ -786,6 +793,14 @@ export default function App() {
           onClose={() => setShowMissionSelect(false)}
           onSelectMission={(mId) => handleStartGame(false, false, undefined, mId)}
           currentMissionId={quest.currentMissionId}
+        />
+      )}
+
+      {/* Share & QR Code Modal */}
+      {showShare && (
+        <ShareModal
+          isOpen={showShare}
+          onClose={() => setShowShare(false)}
         />
       )}
     </div>

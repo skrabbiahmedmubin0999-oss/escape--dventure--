@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Play, Users, BookOpen, Settings, User, Compass, Key, Sparkles, Volume2, VolumeX, Swords, Crosshair } from 'lucide-react';
+import { Play, Users, BookOpen, Settings, User, Compass, Key, Sparkles, Volume2, VolumeX, Swords, Crosshair, QrCode } from 'lucide-react';
 import { sound } from '../audio/soundSystem';
 
 interface MainMenuProps {
@@ -9,6 +9,7 @@ interface MainMenuProps {
   onOpenSettings: () => void;
   onOpenProfile: () => void;
   onOpenMissionSelect: () => void;
+  onOpenShare: () => void;
   playerName: string;
   playerTitle: string;
   isMuted: boolean;
@@ -22,6 +23,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onOpenSettings,
   onOpenProfile,
   onOpenMissionSelect,
+  onOpenShare,
   playerName,
   playerTitle,
   isMuted,
@@ -202,17 +204,28 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             </span>
           </button>
 
-          {/* Grid of secondary actions: How to Play & Settings */}
-          <div className="grid grid-cols-2 gap-2.5 mt-0.5">
+          {/* Grid of secondary actions: How to Play, Settings & QR Code Share */}
+          <div className="grid grid-cols-3 gap-2 mt-0.5">
             <button
               onClick={() => {
                 sound.playClick();
                 onOpenHowToPlay();
               }}
-              className="py-2.5 sm:py-3 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-200 font-semibold text-xs tracking-wide border border-slate-700 shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="py-2.5 px-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-200 font-semibold text-[11px] tracking-wide border border-slate-700 shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400" />
-              <span>How to Play</span>
+              <BookOpen className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">How to Play</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenShare();
+              }}
+              className="py-2.5 px-2 rounded-xl bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-200 font-semibold text-[11px] tracking-wide border border-emerald-600/40 shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <QrCode className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="truncate">QR Code</span>
             </button>
 
             <button
@@ -220,10 +233,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({
                 sound.playClick();
                 onOpenSettings();
               }}
-              className="py-2.5 sm:py-3 px-3 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-200 font-semibold text-xs tracking-wide border border-slate-700 shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="py-2.5 px-2 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 text-slate-200 font-semibold text-[11px] tracking-wide border border-slate-700 shadow-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              <Settings className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-              <span>Settings</span>
+              <Settings className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="truncate">Settings</span>
             </button>
           </div>
         </div>
