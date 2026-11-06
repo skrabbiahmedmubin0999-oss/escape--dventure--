@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IslandWorld } from './game/IslandWorld';
-import { GameMode, GameSettings, PlayerCustomization, PlayerStats, QuestProgress, EnvironmentState, TimeOfDay, WeatherType, NotificationToast } from './game/types';
+import { GameMode, GameSettings, PlayerCustomization, PlayerStats, QuestProgress, EnvironmentState, TimeOfDay, WeatherType, NotificationToast, ControlLayoutConfig, DEFAULT_CONTROL_LAYOUT } from './game/types';
 import { sound } from './audio/soundSystem';
 import { MainMenu } from './components/MainMenu';
 import { GameHUD } from './components/GameHUD';
@@ -10,6 +10,7 @@ import { ProfileModal } from './components/ProfileModal';
 import { HowToPlayModal } from './components/HowToPlayModal';
 import { VictoryModal } from './components/VictoryModal';
 import { MobileControls } from './components/MobileControls';
+import { ControlCustomizerModal } from './components/ControlCustomizerModal';
 import { NotificationToastContainer } from './components/NotificationToast';
 import { PuzzleModal } from './components/PuzzleModal';
 import { InventoryModal } from './components/InventoryModal';
@@ -146,6 +147,40 @@ export default function App() {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showMissionSelect, setShowMissionSelect] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [showControlCustomizer, setShowControlCustomizer] = useState(false);
+  const [controlLayout, setControlLayout] = useState<ControlLayoutConfig>(() => {
+    try {
+      const saved = localStorage.getItem('escape_adventure_controls_layout');
+      return saved ? JSON.parse(saved) : DEFAULT_CONTROL_LAYOUT;
+    } catch {
+      return DEFAULT_CONTROL_LAYOUT;
+    }
+  });
+
+  const handleSaveControlLayout = (newLayout: ControlLayoutConfig) => {
+    setControlLayout(newLayout);
+    try {
+      localStorage.setItem('escape_adventure_controls_layout', JSON.stringify(newLayout));
+      addToast({
+        type: 'achievement',
+        title: 'Controls Updated',
+        message: 'Custom touch control layout saved successfully!',
+      });
+    } catch {}
+  };
+
+  const handleResetControlLayout = () => {
+    setControlLayout(DEFAULT_CONTROL_LAYOUT);
+    try {
+      localStorage.removeItem('escape_adventure_controls_layout');
+      addToast({
+        type: 'achievement',
+        title: 'Controls Reset',
+        message: 'Touch control layout restored to default.',
+      });
+    } catch {}
+  };
+
   const [activePuzzleId, setActivePuzzleId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<NotificationToast[]>([]);
   const [finalTime, setFinalTime] = useState<number>(0);
@@ -691,6 +726,7 @@ export default function App() {
             onThrowStone={() => {
               if (worldRef.current) worldRef.current.throwStone();
             }}
+            layout={controlLayout}
           />
         </>
       )}
@@ -771,6 +807,21 @@ export default function App() {
           settings={settings}
           onUpdateSettings={(newVals) => setSettings((prev) => ({ ...prev, ...newVals }))}
           onSaveProgress={mode === 'playing' ? saveGameProgress : undefined}
+          onOpenControlCustomizer={() => {
+            setShowSettings(false);
+            setShowControlCustomizer(true);
+          }}
+        />
+      )}
+
+      {/* Control Customizer Modal */}
+      {showControlCustomizer && (
+        <ControlCustomizerModal
+          isOpen={showControlCustomizer}
+          onClose={() => setShowControlCustomizer(false)}
+          layout={controlLayout}
+          onSaveLayout={handleSaveControlLayout}
+          onResetLayout={handleResetControlLayout}
         />
       )}
 

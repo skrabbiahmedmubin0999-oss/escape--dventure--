@@ -9,6 +9,7 @@ interface SettingsModalProps {
   settings: GameSettings;
   onUpdateSettings: (newSettings: Partial<GameSettings>) => void;
   onSaveProgress?: () => void;
+  onOpenControlCustomizer?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -16,6 +17,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onUpdateSettings,
   onSaveProgress,
+  onOpenControlCustomizer,
 }) => {
   const [auditResults, setAuditResults] = useState<PhysicsTestResult[] | null>(null);
   return (
@@ -164,6 +166,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
               </label>
             </div>
+
+            {/* Customize Controls Button */}
+            {onOpenControlCustomizer && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenControlCustomizer();
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/40 flex items-center justify-center gap-2 transition-all cursor-pointer shadow"
+              >
+                <span>Customize Mobile Touch Controls & HUD</span>
+              </button>
+            )}
           </div>
 
           {/* Environment & Atmosphere Section */}

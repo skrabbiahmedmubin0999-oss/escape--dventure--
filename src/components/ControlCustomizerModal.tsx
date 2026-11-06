@@ -1,0 +1,204 @@
+import React, { useState } from 'react';
+import { X, Sliders, RotateCcw, Save, ShieldCheck, Move } from 'lucide-react';
+import { sound } from '../audio/soundSystem';
+import { ControlLayoutConfig, DEFAULT_CONTROL_LAYOUT } from '../game/types';
+
+interface ControlCustomizerModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  layout: ControlLayoutConfig;
+  onSaveLayout: (newLayout: ControlLayoutConfig) => void;
+  onResetLayout: () => void;
+}
+
+export const ControlCustomizerModal: React.FC<ControlCustomizerModalProps> = ({
+  isOpen,
+  onClose,
+  layout,
+  onSaveLayout,
+  onResetLayout,
+}) => {
+  const [currentLayout, setCurrentLayout] = useState<ControlLayoutConfig>(layout);
+  const [activeTab, setActiveTab] = useState<keyof ControlLayoutConfig>('joystick');
+
+  if (!isOpen) return null;
+
+  const updateElement = (key: keyof ControlLayoutConfig, field: keyof ControlLayoutConfig['joystick'], value: number) => {
+    setCurrentLayout((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        [field]: value,
+      },
+    }));
+  };
+
+  const labels: Record<keyof ControlLayoutConfig, { name: string; desc: string }> = {
+    joystick: { name: 'Virtual Movement Joystick', desc: 'Left-side directional thumbstick for navigation' },
+    actionCluster: { name: 'Action Buttons (Jump, Run, Hide, Distract)', desc: 'Movement and stealth utility buttons' },
+    interactButton: { name: 'Proximity Interact Button', desc: 'Contextual pickup, open, and activate button' },
+    combatCluster: { name: 'Combat & Weapon Cluster', desc: 'Strike/Fire, Block/Parry, and Dodge buttons' },
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-md font-sans">
+      <div className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950/80 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400">
+              <Sliders className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-black text-white leading-tight">Customize Mobile Controls</h2>
+              <p className="text-xs text-slate-400">Adjust scale, opacity & position offsets</p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              sound.playClick();
+              onClose();
+            }}
+            className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-3 bg-slate-950/60 border-b border-slate-800 shrink-0">
+          {(Object.keys(labels) as (keyof ControlLayoutConfig)[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => {
+                sound.playClick();
+                setActiveTab(key);
+              }}
+              className={`py-2 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer truncate ${
+                activeTab === key
+                  ? 'bg-amber-500 text-slate-950 shadow-md border border-amber-300'
+                  : 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800'
+              }`}
+            >
+              {labels[key].name.split(' ')[0]}
+            </button>
+          ))}
+        </div>
+
+        {/* Customization Body */}
+        <div className="p-5 space-y-6 overflow-y-auto flex-1">
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-1">
+            <div className="text-xs font-black text-amber-400 uppercase tracking-wider">{labels[activeTab].name}</div>
+            <div className="text-xs text-slate-400">{labels[activeTab].desc}</div>
+          </div>
+
+          {/* Scale Slider */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-300">
+              <span>Button Scale / Size</span>
+              <span className="font-mono text-amber-400">{(currentLayout[activeTab].scale * 100).toFixed(0)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.7"
+              max="1.4"
+              step="0.05"
+              value={currentLayout[activeTab].scale}
+              onChange={(e) => updateElement(activeTab, 'scale', parseFloat(e.target.value))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+          </div>
+
+          {/* Opacity Slider */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-300">
+              <span>Button Opacity</span>
+              <span className="font-mono text-amber-400">{(currentLayout[activeTab].opacity * 100).toFixed(0)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0.4"
+              max="1.0"
+              step="0.05"
+              value={currentLayout[activeTab].opacity}
+              onChange={(e) => updateElement(activeTab, 'opacity', parseFloat(e.target.value))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+          </div>
+
+          {/* Position X Offset */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-300">
+              <span>Horizontal Offset (X)</span>
+              <span className="font-mono text-amber-400">{currentLayout[activeTab].x} px</span>
+            </div>
+            <input
+              type="range"
+              min="-120"
+              max="120"
+              step="5"
+              value={currentLayout[activeTab].x}
+              onChange={(e) => updateElement(activeTab, 'x', parseInt(e.target.value))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+          </div>
+
+          {/* Position Y Offset */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold text-slate-300">
+              <span>Vertical Offset (Y)</span>
+              <span className="font-mono text-amber-400">{currentLayout[activeTab].y} px</span>
+            </div>
+            <input
+              type="range"
+              min="-120"
+              max="120"
+              step="5"
+              value={currentLayout[activeTab].y}
+              onChange={(e) => updateElement(activeTab, 'y', parseInt(e.target.value))}
+              className="w-full accent-amber-500 cursor-pointer"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+          <button
+            onClick={() => {
+              sound.playClick();
+              setCurrentLayout(DEFAULT_CONTROL_LAYOUT);
+              onResetLayout();
+            }}
+            className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs flex items-center gap-2 border border-slate-800 transition-all cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 text-amber-400" />
+            <span>Reset Default</span>
+          </button>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                sound.playClick();
+                onClose();
+              }}
+              className="py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                sound.playClick();
+                onSaveLayout(currentLayout);
+                onClose();
+              }}
+              className="py-2.5 px-5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-lg transition-all cursor-pointer"
+            >
+              <Save className="w-4 h-4" />
+              <span>Save Layout</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

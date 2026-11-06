@@ -208,6 +208,27 @@ export interface NetworkSyncPayload {
   timestamp: number;
 }
 
+export interface ControlElementConfig {
+  x: number;
+  y: number;
+  scale: number;
+  opacity: number;
+}
+
+export interface ControlLayoutConfig {
+  joystick: ControlElementConfig;
+  actionCluster: ControlElementConfig;
+  interactButton: ControlElementConfig;
+  combatCluster: ControlElementConfig;
+}
+
+export const DEFAULT_CONTROL_LAYOUT: ControlLayoutConfig = {
+  joystick: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
+  actionCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
+  interactButton: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
+  combatCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
+};
+
 declare global {
   interface Window {
     __togglePhysicsWireframes: () => boolean;
