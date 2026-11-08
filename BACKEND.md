@@ -1,26 +1,51 @@
-# ESCAPE Adventure backend
+# ESCAPE Adventure — Backend Phase 2 checkpoint
 
-## Audit findings
+## Current architecture
 
-The repository already had an Express server, `/api/v1` routes, TypeScript record interfaces, and IndexedDB/localStorage persistence. The original API router was an in-memory demo store (lost on restart), returned the same guest for every caller, accepted arbitrary objects via object spread, and allowed any origin with wildcard CORS. The browser game uses IndexedDB/localStorage for its real offline save/settings flow; it did not call the REST API. No configured database driver, database migration runner, authentication provider, or durable server repository was present.
+The game is a React + TypeScript + Three.js PWA. `src/game/storage/StorageAdapter.ts` delegates primary local persistence to IndexedDB with localStorage fallback. The Express server (`server.ts`) exposes versioned routes implemented in `src/server/apiRouter.ts`; guest profiles, settings and versioned save payloads are persisted in a JSON file by `src/server/playerStore.ts`. No SQL driver, migration runner, external identity provider, or multiplayer transport is configured.
 
-## Current implementation
+## API
 
-- The API now uses a small durable JSON player repository at `DATA_DIR/escape-data.json` (default `.data/escape-data.json`). Writes are serialized and atomically replace the data file. This is a practical single-instance storage adapter, not a substitute for PostgreSQL in a multi-instance deployment.
-- `POST /api/v1/auth/guest` creates a unique guest and returns an HMAC-signed bearer token. No passwords or account credentials are collected. Protected routes use the bearer identity rather than a caller-controlled player ID.
-- Authenticated APIs: `GET /players/me`, `DELETE /players/me`, `GET|PUT /profiles/me`, `GET|PUT /settings/me`, and `GET|PUT /saves/me`.
-- Save writes require a matching `expectedRevision` and version 1 payload. A stale revision receives HTTP 409; this endpoint stores client backup data only and does not award XP, currency, achievements, or mission rewards. Local gameplay remains authoritative and offline-first.
-- Inputs are allowlisted and validated. Request body size, basic per-IP rate limits, secure response headers, same-origin default CORS, optional origin allowlisting, structured request logs, health checks, and graceful HTTP shutdown are configured.
+All paths below are prefixed with `/api/v1`.
 
-## Configuration and operations
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| GET | `/health` | No | API liveness |
+| POST | `/auth/guest` | No | Create guest identity and HMAC bearer token |
+| GET | `/players/me` | Bearer | Read current player identifier metadata |
+| DELETE | `/players/me` | Bearer | Delete only the authenticated player's server record |
+| GET / PUT | `/profiles/me` | Bearer | Read or allowlisted profile update |
+| GET / PUT | `/settings/me` | Bearer | Read or validated settings patch |
+| GET / PUT | `/saves/me` | Bearer | Read save or write version-1 payload with `expectedRevision` |
 
-Copy `.env.example` to `.env` for local work. For a production deployment set `NODE_ENV=production`, `SESSION_SECRET` to a unique random secret of at least 32 characters, `DATA_DIR` to durable persistent storage, and `ALLOWED_ORIGINS` to a comma-separated list of exact frontend origins if cross-origin requests are needed. Do not mount `.data` as ephemeral storage if data must survive restarts. Deploy only one server instance with the JSON store; use a transactional SQL adapter and migrations before horizontal scaling or public competitive progression. No external service is contacted or deployed by this change.
+Save update request shape: `{ "expectedRevision": 0, "save": { "version": 1, "payload": {} } }`. Payload limit is 256 KiB (JSON request parser limit is 300 KiB). Writes to an outdated revision return HTTP 409 and do not replace the current save. Saves are untrusted backup blobs; they do not grant progression or rewards.
 
-Commands: `npm run lint`, `npm run build`, `npm run start`. The backend does not claim that a guest-only, local/offline game is cheat-proof. Cloud save payloads are untrusted client backups and are never treated as authoritative reward events.
+## Development and production
 
-## Remaining work / limitations
+```sh
+cp .env.example .env
+npm install
+npm run lint
+npm test
+npm run build
+npm start
+```
 
-- The existing React app has not yet been wired to this optional API; its IndexedDB/localStorage remains the active persistence and keeps offline play functional. A later cloud-sync phase should explicitly integrate the token and revision protocol with local saves and define user-controlled merge UX.
-- Guest identities are not recoverable across device/browser storage loss. Account registration, passwords, recovery, and account linking are intentionally not invented.
-- JSON storage is single-process/single-instance only; there are no relational DB migrations, transaction-backed reward ledger, multiplayer authority, or external monitoring provider.
-- The in-memory IP limiter is a basic per-process guard, not a distributed abuse defense. Configure proxy trust only for a trusted reverse proxy.
+`server.ts` loads `.env` via the existing `dotenv` dependency. Production requires `NODE_ENV=production` and a unique `SESSION_SECRET` of at least 32 bytes (for example `openssl rand -hex 32`). Set `DATA_DIR` to durable storage and `ALLOWED_ORIGINS` to exact origins only when the browser app is hosted on another origin. Set `TRUST_PROXY=true` only behind a trusted single reverse proxy. `.data/` is private server data and ignored by Git.
+
+## Offline and sync status
+
+The game continues to use IndexedDB/localStorage as its active save/settings store. The backend API is **not yet integrated into `App.tsx`**; no guest token lifecycle, sync queue, backoff/retry, local/cloud revision metadata, or conflict-resolution UI currently exists. Do not display cloud-synced status. No gameplay request waits for the server.
+
+## Security and known limitations
+
+- API uses signed bearer tokens, server-derived player identity, allowlisted profile/settings patches, save payload limits, exact-origin CORS allowlisting, basic process-local rate limiting, generic internal error responses, security headers and a production secret check.
+- Guest tokens are bearer credentials. The frontend integration must persist them only in an appropriate client-side mechanism and clear them on logout/deletion; local browser storage cannot protect against same-origin script compromise.
+- JSON storage is single-process and single-instance only. The write queue protects one `PlayerStore` process; it is not a distributed lock and is not horizontally scalable. Atomic rename does not guarantee fsync-level recovery against all power loss scenarios.
+- Invalid/corrupted JSON fails startup without overwriting the file. Preserve the file and restore a known-good backup; automatic recovery/migration is not implemented.
+- Rate limiting is process-local, not a distributed abuse defense. Multiplayer, password accounts, account recovery/linking, authoritative progression/rewards, relational database migrations and external monitoring are not implemented.
+- The frontend currently has local persistence and remains playable offline. A separate sync adapter and conflict UX are required before cloud sync can be described as implemented.
+
+## Tests
+
+`npm test` targets `src/server/*.test.ts`, including store persistence, revision conflict and token tests. HTTP route coverage and browser/offline integration coverage remain incomplete. Run the commands above in a Node environment with dependencies installed; do not infer passing status from the presence of test files.
