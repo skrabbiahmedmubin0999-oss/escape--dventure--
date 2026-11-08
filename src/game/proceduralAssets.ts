@@ -108,51 +108,40 @@ export function createAdventurerModel(initialTunic = '#e67e22', initialHat = '#8
   // Materials
   const skinMat = new THREE.MeshStandardMaterial({
     color: 0xffd1a4,
-    roughness: 0.6,
+    roughness: 0.5,
     metalness: 0.05,
   });
 
   const tunicMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(initialTunic),
-    roughness: 0.75,
+    roughness: 0.8,
     metalness: 0.1,
   });
 
   const hatMat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(initialHat),
-    roughness: 0.8,
+    roughness: 0.7,
     metalness: 0.1,
   });
 
   const beltMat = new THREE.MeshStandardMaterial({
     color: 0x3e2723,
-    roughness: 0.5,
-    metalness: 0.2,
+    roughness: 0.6,
   });
 
-  const buckleMat = new THREE.MeshStandardMaterial({
-    color: 0xf1c40f,
-    roughness: 0.3,
-    metalness: 0.85,
-  });
+  const buckleMat = Materials.metal;
 
   const pantsMat = new THREE.MeshStandardMaterial({
     color: 0x2c3e50,
     roughness: 0.8,
-    metalness: 0.1,
   });
 
   const bootMat = new THREE.MeshStandardMaterial({
     color: 0x4a2810,
-    roughness: 0.6,
-    metalness: 0.15,
+    roughness: 0.7,
   });
 
-  const packMat = new THREE.MeshStandardMaterial({
-    color: 0x795548,
-    roughness: 0.7,
-    metalness: 0.1,
-  });
+  const packMat = Materials.wood; // Textured leather/wood look
 
   // Torso
   const torso = new THREE.Group();
@@ -226,12 +215,19 @@ export function createAdventurerModel(initialTunic = '#e67e22', initialHat = '#8
 
   // Explorer Stylized Eyes
   const eyeMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-  const eyeGeo = new THREE.SphereGeometry(0.035, 6, 6);
+  const eyeGeo = new THREE.SphereGeometry(0.04, 8, 8);
   const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(0.09, 0.02, 0.21);
+  leftEye.position.set(0.1, 0.04, 0.22);
   const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(-0.09, 0.02, 0.21);
+  rightEye.position.set(-0.1, 0.04, 0.22);
   head.add(leftEye, rightEye);
+
+  // Scarf for extra detail
+  const scarfGeo = new THREE.TorusGeometry(0.24, 0.08, 8, 16);
+  scarfGeo.rotateX(Math.PI / 2);
+  const scarf = new THREE.Mesh(scarfGeo, new THREE.MeshStandardMaterial({ color: initialHat, roughness: 0.9 }));
+  scarf.position.y = -0.15;
+  head.add(scarf);
 
   torso.add(head);
 
@@ -538,9 +534,11 @@ export function createIslandTerrain(): THREE.Group {
 
   const terrainMat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: 0.85,
-    metalness: 0.05,
+    roughness: 0.9,
+    metalness: 0.0,
     flatShading: true,
+    bumpMap: Materials.stone.bumpMap,
+    bumpScale: 0.04,
   });
 
   const terrainMesh = new THREE.Mesh(geometry, terrainMat);
@@ -558,11 +556,12 @@ export function createWaterMesh(): THREE.Mesh {
   geo.rotateX(-Math.PI / 2);
 
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x1abc9c,
+    color: 0x0ea5e9,
     roughness: 0.1,
-    metalness: 0.25,
+    metalness: 0.4,
     transparent: true,
-    opacity: 0.8,
+    opacity: 0.75,
+    envMapIntensity: 1.5,
   });
 
   const mesh = new THREE.Mesh(geo, mat);
@@ -577,22 +576,13 @@ export function createWaterMesh(): THREE.Mesh {
 export function createTree(type: 'palm' | 'oak' | 'pine' | 'sacred'): THREE.Group {
   const tree = new THREE.Group();
 
-  const woodMat = new THREE.MeshStandardMaterial({
-    color: type === 'sacred' ? 0x4a2e18 : 0x6e4726,
-    roughness: 0.85,
-    metalness: 0.05,
-  });
+  const woodMat = Materials.wood;
 
-  const leafMat1 = new THREE.MeshStandardMaterial({
-    color: type === 'sacred' ? 0x2ecc71 : 0x27ae60,
-    roughness: 0.7,
-    metalness: 0.05,
-    flatShading: true,
-  });
+  const leafMat1 = Materials.grass;
 
   const leafMat2 = new THREE.MeshStandardMaterial({
-    color: type === 'sacred' ? 0xa3e4d7 : 0x2ecc71,
-    roughness: 0.65,
+    color: type === 'sacred' ? 0x6ee7b7 : 0x4ade80,
+    roughness: 0.8,
     metalness: 0.05,
     flatShading: true,
   });
@@ -1234,24 +1224,14 @@ export function createTreasureChest(): TreasureChestInstance {
   const root = new THREE.Group();
   root.name = 'TreasureChest';
 
-  const woodMat = new THREE.MeshStandardMaterial({
-    color: 0x4e342e,
-    roughness: 0.8,
-    metalness: 0.1,
-  });
-
-  const metalMat = new THREE.MeshStandardMaterial({
-    color: 0xd4ac0d, // Antique brass
-    roughness: 0.35,
-    metalness: 0.85,
-  });
-
+  const woodMat = Materials.wood;
+  const metalMat = Materials.metal;
   const goldMat = new THREE.MeshStandardMaterial({
     color: 0xf1c40f,
     emissive: 0xf39c12,
-    emissiveIntensity: 0.6,
-    roughness: 0.2,
-    metalness: 0.9,
+    emissiveIntensity: 0.8,
+    roughness: 0.15,
+    metalness: 0.95,
   });
 
   // Main Chest Box Base (w: 1.1, h: 0.55, d: 0.75)
@@ -2270,11 +2250,16 @@ export function createStoneCottage(width = 6.0, height = 3.5, depth = 5.0, detai
 
   const wallMat = Materials.stone;
   const timberMat = Materials.wood;
+  const windowGlowMat = new THREE.MeshStandardMaterial({
+    color: 0xfef08a,
+    emissive: 0xeab308,
+    emissiveIntensity: 1.8,
+  });
 
   const roofMat = new THREE.MeshStandardMaterial({
-    color: 0xb91c1c, // Terracotta roof tiles
-    roughness: 0.7,
-    metalness: 0.1,
+    color: 0x7c2d12, // Deep terracotta
+    roughness: 0.8,
+    metalness: 0.05,
   });
 
   // Base stone foundation slab
@@ -2310,6 +2295,25 @@ export function createStoneCottage(width = 6.0, height = 3.5, depth = 5.0, detai
   backWall.castShadow = detailLevel === 0;
   backWall.receiveShadow = true;
   building.add(backWall);
+
+  if (detailLevel === 0) {
+    // Add glowing windows
+    const winGeo = new THREE.PlaneGeometry(0.8, 1.2);
+    const windows = [
+      { x: width * 0.5 + 0.01, y: h * 0.6 + 0.4, z: depth * 0.2, rot: Math.PI / 2 },
+      { x: -width * 0.5 - 0.01, y: h * 0.6 + 0.4, z: -depth * 0.2, rot: -Math.PI / 2 },
+    ];
+    windows.forEach(w => {
+      const win = new THREE.Mesh(winGeo, windowGlowMat);
+      win.position.set(w.x, w.y, w.z);
+      win.rotation.y = w.rot;
+      building.add(win);
+      
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.4, 1.0), timberMat);
+      frame.position.copy(win.position);
+      building.add(frame);
+    });
+  }
 
   // Left/Right Walls
   const sideWallGeo = new THREE.BoxGeometry(wallThick, h, depth - wallThick * 2);

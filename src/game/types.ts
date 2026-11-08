@@ -53,6 +53,8 @@ export interface GameSettings {
   joystickSensitivity?: number;
   invertY: boolean;
   showFps: boolean;
+  hapticsEnabled: boolean;
+  hapticsIntensity: 'low' | 'medium' | 'high';
   timeOfDay?: TimeOfDay;
   weather?: WeatherType;
   autoDayNight?: boolean;
@@ -196,6 +198,16 @@ export interface AchievementItem {
   rewardXp: number;
 }
 
+export interface DailyChallenge {
+  id: string;
+  title: string;
+  description: string;
+  objectiveCount: number;
+  currentCount: number;
+  rewardXp: number;
+  completed: boolean;
+}
+
 // Co-op & Multiplayer Event Synchronization Ready Interface
 export interface NetworkSyncPayload {
   playerId: string;
@@ -214,6 +226,7 @@ export interface ControlElementConfig {
   y: number;
   scale: number;
   opacity: number;
+  enabled?: boolean;
 }
 
 export interface ControlLayoutConfig {
@@ -221,13 +234,120 @@ export interface ControlLayoutConfig {
   actionCluster: ControlElementConfig;
   interactButton: ControlElementConfig;
   combatCluster: ControlElementConfig;
+  vitalsBar?: ControlElementConfig;
+  miniMap?: ControlElementConfig;
+  objectiveTracker?: ControlElementConfig;
 }
 
+export type GraphicsQualityPreset = 'low' | 'medium' | 'high' | 'ultra' | 'auto';
+
+export interface AdvancedGraphicsSettings {
+  qualityPreset: GraphicsQualityPreset;
+  renderScale: number; // 0.5 to 1.5
+  shadowQuality: 'off' | 'low' | 'medium' | 'high' | 'ultra';
+  textureQuality: 'low' | 'medium' | 'high' | 'ultra';
+  antiAliasing: 'off' | 'fxaa' | 'msaa';
+  ambientOcclusion: 'off' | 'low' | 'high';
+  viewDistance: number; // 50 to 250 meters
+  effectsQuality: 'low' | 'medium' | 'high';
+  postProcessing: boolean;
+  vsync: boolean;
+  fpsLimit: 30 | 60 | 120 | 0;
+  dynamicResolution: boolean;
+}
+
+export interface KeyBindings {
+  moveForward: string;
+  moveBackward: string;
+  moveLeft: string;
+  moveRight: string;
+  sprint: string;
+  crouch: string;
+  jump: string;
+  interact: string;
+  attack: string;
+  parry: string;
+  dodge: string;
+  shoot: string;
+  throwStone: string;
+  openInventory: string;
+  openAchievements: string;
+  pause: string;
+}
+
+export const DEFAULT_KEY_BINDINGS: KeyBindings = {
+  moveForward: 'KeyW',
+  moveBackward: 'KeyS',
+  moveLeft: 'KeyA',
+  moveRight: 'KeyD',
+  sprint: 'ShiftLeft',
+  crouch: 'KeyC',
+  jump: 'Space',
+  interact: 'KeyE',
+  attack: 'KeyF',
+  parry: 'KeyR',
+  dodge: 'KeyX',
+  shoot: 'KeyG',
+  throwStone: 'KeyQ',
+  openInventory: 'KeyI',
+  openAchievements: 'KeyT',
+  pause: 'Escape',
+};
+
+export interface HUDProfile {
+  id: string;
+  name: string;
+  presetType: 'default' | 'mobile' | 'desktop' | 'minimal' | 'advanced' | 'custom';
+  layout: ControlLayoutConfig;
+}
+
+export interface FeatureModuleConfig {
+  id: string;
+  name: string;
+  category: 'Graphics' | 'Performance' | 'Controls' | 'HUD' | 'Gameplay' | 'AI' | 'Audio' | 'Accessibility' | 'Experimental';
+  description: string;
+  enabled: boolean;
+  status: 'active' | 'supported' | 'inactive' | 'failed';
+  performanceImpact: 'Zero' | 'Low' | 'Medium' | 'High';
+}
+
+export interface PerformanceDiagnostics {
+  fps: number;
+  frameTimeMs: number;
+  memoryHeapMb: number | null;
+  activeMeshes: number;
+  drawCalls: number;
+  triangles: number;
+  physicsObjects: number;
+  aiNodes: number;
+  renderScale: number;
+  rendererName: string;
+  isSoftwareGl: boolean;
+}
+
+export const DEFAULT_ADVANCED_GRAPHICS: AdvancedGraphicsSettings = {
+  qualityPreset: 'high',
+  renderScale: 1.0,
+  shadowQuality: 'high',
+  textureQuality: 'high',
+  antiAliasing: 'fxaa',
+  ambientOcclusion: 'low',
+  viewDistance: 150,
+  effectsQuality: 'high',
+  postProcessing: true,
+  vsync: true,
+  fpsLimit: 60,
+  dynamicResolution: true,
+};
+
 export const DEFAULT_CONTROL_LAYOUT: ControlLayoutConfig = {
-  joystick: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
-  actionCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
-  interactButton: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
-  combatCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0 },
+  joystick: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  actionCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  interactButton: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  combatCluster: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  vitalsBar: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  miniMap: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
+  objectiveTracker: { x: 0, y: 0, scale: 1.0, opacity: 1.0, enabled: true },
 };
 
 declare global {

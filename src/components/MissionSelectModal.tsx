@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Swords, Crosshair, Shield, Eye } from 'lucide-react';
+import { X, Swords, Crosshair, Shield, Eye, Play } from 'lucide-react';
 import { MISSION_CONFIGS } from '../game/levelManifest';
 import { sound } from '../audio/soundSystem';
 
@@ -17,30 +17,33 @@ export const MissionSelectModal: React.FC<MissionSelectModalProps> = ({
   const missions = Object.values(MISSION_CONFIGS);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-slate-900 border-2 border-amber-500/50 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] transform animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] w-full max-w-2xl landscape:max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90dvh] ring-1 ring-white/5 transform animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-3.5 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 flex items-center justify-center border border-amber-500/40 text-amber-400 shrink-0">
-              <Swords className="w-5 h-5 sm:w-6 sm:h-6" />
+        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between bg-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-400 shrink-0 shadow-inner">
+              <Swords className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-xl font-black text-white uppercase tracking-tight">Mission Selection</h2>
-              <p className="text-[9px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest">Select your next infiltration target</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-white uppercase tracking-tight leading-tight">Tactical Deployment</h2>
+                <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">মিশন নির্বাচন</span>
+              </div>
+              <p className="text-[10px] text-amber-500/60 font-black uppercase tracking-[0.25em]">Select Infiltration Vector</p>
             </div>
           </div>
           <button 
             onClick={() => { sound.playClick(); onClose(); }}
-            className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl hover:bg-slate-800 text-slate-400 hover:text-white transition-colors pointer-events-auto flex items-center justify-center cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-white transition-all flex items-center justify-center cursor-pointer group"
             aria-label="Close"
           >
-            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+            <X className="w-4 h-4 transition-transform group-hover:rotate-90" />
           </button>
         </div>
 
-        {/* Mission List */}
-        <div className="p-3 sm:p-5 overflow-y-auto space-y-3 custom-scrollbar flex-1">
+        {/* Mission List - 2 Columns in Landscape */}
+        <div className="p-4 sm:p-6 overflow-y-auto landscape:grid landscape:grid-cols-2 landscape:gap-4 space-y-3 landscape:space-y-0 custom-scrollbar flex-1">
           {missions.map((mission) => (
             <button
               key={mission.id}
@@ -48,72 +51,75 @@ export const MissionSelectModal: React.FC<MissionSelectModalProps> = ({
                 sound.playClick();
                 onSelectMission(mission.id);
               }}
-              className={`w-full text-left p-3 sm:p-4 rounded-2xl border-2 transition-all group flex flex-row gap-3 items-center pointer-events-auto cursor-pointer active:scale-[0.99] ${
+              className={`w-full text-left p-5 rounded-3xl border transition-all group flex flex-row gap-5 items-center cursor-pointer active:scale-[0.99] relative overflow-hidden ${
                 currentMissionId === mission.id
-                  ? 'bg-amber-500/10 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]'
-                  : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60 hover:border-slate-600'
+                  ? 'bg-amber-500/10 border-amber-500/40 shadow-[0_0_25px_rgba(245,158,11,0.15)]'
+                  : 'bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10'
               }`}
             >
-              {/* Mission Icon/Type */}
-              <div className={`w-11 h-11 xs:w-13 xs:h-13 rounded-2xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+              {currentMissionId === mission.id && (
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500" />
+              )}
+              
+              {/* Mission Icon */}
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 border transition-all group-hover:scale-105 shadow-inner ${
                 mission.allowFirearms 
-                  ? 'bg-red-500/10 border-red-500/30 text-red-400' 
-                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                   ? 'bg-red-500/10 border-red-500/20 text-red-400' 
+                   : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
               }`}>
-                {mission.allowFirearms ? <Crosshair className="w-5 h-5 xs:w-6 xs:h-6" /> : <Eye className="w-5 h-5 xs:w-6 xs:h-6" />}
+                {mission.allowFirearms ? <Crosshair className="w-7 h-7" /> : <Eye className="w-7 h-7" />}
               </div>
 
               {/* Mission Details */}
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                  <h3 className="font-black text-slate-100 text-xs xs:text-sm uppercase tracking-tight truncate">{mission.title}</h3>
-                  {mission.allowFirearms && (
-                    <span className="bg-red-600 text-[8px] xs:text-[9px] font-black text-white px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-sm shrink-0">
-                      Firearm Authorized
-                    </span>
-                  )}
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h3 className="font-black text-slate-100 text-sm uppercase tracking-wider">{mission.title}</h3>
+                  <div className="flex gap-2">
+                    {mission.allowFirearms && (
+                      <span className="bg-red-500/20 text-[8px] font-black text-red-400 px-2.5 py-1 rounded-lg border border-red-500/30 uppercase tracking-widest">
+                        Firearm Auth
+                      </span>
+                    )}
+                    {currentMissionId === mission.id && (
+                      <span className="bg-amber-500 text-[8px] font-black text-slate-950 px-2.5 py-1 rounded-lg uppercase tracking-widest animate-pulse">
+                        Selected
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-[11px] xs:text-xs text-slate-400 font-medium leading-relaxed line-clamp-2">
-                  {mission.description}
+                <p className="text-[11px] text-slate-400 font-medium leading-relaxed line-clamp-2 italic">
+                  "{mission.description}"
                 </p>
                 
-                {/* Stats / Features row */}
-                <div className="flex items-center gap-2 xs:gap-3 pt-0.5 flex-wrap">
-                   <div className="flex items-center gap-1 text-[9px] xs:text-[10px] font-bold text-slate-300">
-                      <Swords className="w-3 h-3 text-amber-500 shrink-0" />
-                      <span>Blade Combat</span>
+                {/* Visual Stats Row */}
+                <div className="flex items-center gap-4 pt-1">
+                   <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-300">
+                      <div className="w-1 h-1 rounded-full bg-amber-500" />
+                      Blade Infiltration
                    </div>
-                   <div className="flex items-center gap-1 text-[9px] xs:text-[10px] font-bold text-slate-300">
-                      <Shield className="w-3 h-3 text-sky-400 shrink-0" />
-                      <span>Parry & Evade</span>
+                   <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-wider text-slate-300">
+                      <div className="w-1 h-1 rounded-full bg-sky-400" />
+                      Neural Link Required
                    </div>
-                   {mission.allowFirearms && (
-                     <div className="flex items-center gap-1 text-[9px] xs:text-[10px] font-bold text-red-400">
-                        <Crosshair className="w-3 h-3 shrink-0" />
-                        <span>{mission.startingAmmo} Rounds</span>
-                     </div>
-                   )}
                 </div>
               </div>
 
-              {/* Selection Indicator */}
-              <div className="hidden xs:flex shrink-0">
-                {currentMissionId === mission.id ? (
-                  <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-slate-900" />
-                  </div>
-                ) : (
-                  <div className="w-5 h-5 rounded-full border-2 border-slate-700 group-hover:border-slate-500" />
-                )}
+              {/* Arrow Indicator */}
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center border transition-all ${
+                currentMissionId === mission.id
+                  ? 'bg-amber-500 border-amber-400 text-slate-950'
+                  : 'bg-white/5 border-white/10 text-slate-500 group-hover:text-slate-300'
+              }`}>
+                <Play className={`w-3 h-3 ${currentMissionId === mission.id ? 'fill-slate-950' : 'fill-transparent'}`} />
               </div>
             </button>
           ))}
         </div>
 
         {/* Footer */}
-        <div className="p-3 sm:p-4 bg-slate-950/40 border-t border-slate-800 text-center shrink-0">
-           <p className="text-[9px] xs:text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-             Stealth remains the highest honor. Pure Ghost runs earn maximum XP rewards.
+        <div className="px-8 py-5 bg-white/5 border-t border-white/5 text-center shrink-0">
+           <p className="text-[9px] text-amber-500/40 font-black uppercase tracking-[0.3em]">
+             Stealth optimization recommended. Avoid direct contact where possible.
            </p>
         </div>
       </div>

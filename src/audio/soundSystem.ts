@@ -370,6 +370,26 @@ class SoundSystem {
       osc.stop(now + note.delay + note.d);
     });
   }
+
+  public playLevelUp() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const notes = [440, 554.37, 659.25, 880, 1108.73, 1318.51]; // A4, C#5, E5, A5, C#6, E6
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+      gain.gain.setValueAtTime(0.001, now + idx * 0.08);
+      gain.gain.linearRampToValueAtTime(0.35, now + idx * 0.08 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.5);
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + idx * 0.08);
+      osc.stop(now + idx * 0.08 + 0.5);
+    });
+  }
   
   public playSwordSlash() {
     this.initContext();
@@ -485,6 +505,29 @@ class SoundSystem {
     gain.connect(this.sfxGain);
     osc.start(now);
     osc.stop(now + 0.3);
+  }
+
+  public playBark() {
+    this.initContext();
+    if (!this.ctx || !this.sfxGain || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(100, now);
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+    osc.frequency.exponentialRampToValueAtTime(150, now + 0.15);
+    
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+    
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.2);
   }
 
   // --- Ambient Background Nature/Music Chords ---

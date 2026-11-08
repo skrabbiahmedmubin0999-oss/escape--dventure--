@@ -7,7 +7,7 @@
  */
 
 const DB_NAME = 'EscapeAdventureDB';
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 
 export const STORES = {
   SETTINGS: 'settings',
@@ -15,6 +15,9 @@ export const STORES = {
   STATS: 'stats',
   SAVED_GAME: 'savedGame',
   CONTROLS_LAYOUT: 'controlsLayout',
+  KEY_BINDINGS: 'keyBindings',
+  FEATURE_MANAGER: 'featureManager',
+  HUD_PROFILES: 'hudProfiles',
 } as const;
 
 export type StoreName = (typeof STORES)[keyof typeof STORES];
@@ -35,7 +38,7 @@ function getDB(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
 
-      // Create Stores if they don't exist
+      // Create all required Stores if they don't exist
       Object.values(STORES).forEach((storeName) => {
         if (!db.objectStoreNames.contains(storeName)) {
           db.createObjectStore(storeName, { keyPath: 'id' });
@@ -45,6 +48,29 @@ function getDB(): Promise<IDBDatabase> {
 
     request.onsuccess = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+
+      // Schema Self-Healing: Verify all required object stores exist before proceeding
+      const missingStores = Object.values(STORES).some((storeName) => !db.objectStoreNames.contains(storeName));
+      if (missingStores) {
+        db.close();
+        dbPromise = null;
+        const upgradeRequest = indexedDB.open(DB_NAME, db.version + 1);
+        upgradeRequest.onupgradeneeded = (upgEvent) => {
+          const upgradeDb = (upgEvent.target as IDBOpenDBRequest).result;
+          Object.values(STORES).forEach((storeName) => {
+            if (!upgradeDb.objectStoreNames.contains(storeName)) {
+              upgradeDb.createObjectStore(storeName, { keyPath: 'id' });
+            }
+          });
+        };
+        upgradeRequest.onsuccess = (upgSuccessEvent) => {
+          resolve((upgSuccessEvent.target as IDBOpenDBRequest).result);
+        };
+        upgradeRequest.onerror = (upgErrEvent) => {
+          reject((upgErrEvent.target as IDBOpenDBRequest).error);
+        };
+        return;
+      }
 
       // Handle DB connection loss gracefully
       db.onversionchange = () => {
@@ -70,6 +96,19 @@ function getDB(): Promise<IDBDatabase> {
 export async function idbGet<T>(storeName: StoreName, id: string = 'default'): Promise<T | null> {
   try {
     const db = await getDB();
+    if (!db.objectStoreNames.contains(storeName)) {
+      // Fallback to localStorage if store doesn't exist yet
+      const fallbackKey = `escape_adventure_idb_${storeName}_${id}`;
+      const legacyKey = storeName === STORES.SETTINGS ? 'escape_adventure_settings' :
+                        storeName === STORES.PROFILE ? 'escape_adventure_profile' :
+                        storeName === STORES.STATS ? 'escape_adventure_stats' :
+                        storeName === STORES.SAVED_GAME ? 'escape_adventure_saved_game' :
+                        storeName === STORES.CONTROLS_LAYOUT ? 'escape_adventure_controls_layout' : null;
+
+      const saved = localStorage.getItem(fallbackKey) || (legacyKey ? localStorage.getItem(legacyKey) : null);
+      return saved ? JSON.parse(saved) : null;
+    }
+
     return new Promise<T | null>((resolve) => {
       const tx = db.transaction(storeName, 'readonly');
       const store = tx.objectStore(storeName);
@@ -137,6 +176,7 @@ export async function idbSet<T>(storeName: StoreName, data: T, id: string = 'def
 
   try {
     const db = await getDB();
+    if (!db.objectStoreNames.contains(storeName)) return;
     return new Promise<void>((resolve, reject) => {
       const tx = db.transaction(storeName, 'readwrite');
       const store = tx.objectStore(storeName);
@@ -189,6 +229,9 @@ export async function verifyIndexedDBStores(): Promise<{
     stats: false,
     savedGame: false,
     controlsLayout: false,
+    keyBindings: false,
+    featureManager: false,
+    hudProfiles: false,
   };
   const details: string[] = [];
 

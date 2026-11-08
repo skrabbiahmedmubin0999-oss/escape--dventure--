@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CheckpointData, ObstacleCourseState } from './types';
 import { sound } from '../audio/soundSystem';
 import { getIslandHeight } from './proceduralAssets';
+import { triggerHaptic, Haptics } from './haptics';
 
 export interface MovingPlatformData {
   mesh: THREE.Group;
@@ -12,6 +13,9 @@ export interface MovingPlatformData {
   direction: number;
   width: number;
   depth: number;
+  rateFactor: number; // Speed multiplier for pacing
+  offset: number;     // Phase offset [0, 1]
+  isPlayerOnBoard?: boolean; // Track boarding state for haptics
 }
 
 export interface RotatingObstacleData {
@@ -19,6 +23,8 @@ export interface RotatingObstacleData {
   centerPos: THREE.Vector3;
   beamLength: number;
   rotationSpeed: number;
+  rateFactor: number; // Speed multiplier for pacing
+  offset: number;     // Phase offset [0, 1]
 }
 
 export class ObstacleSystem {
@@ -61,25 +67,30 @@ export class ObstacleSystem {
     };
   }
 
-  public registerPlatform(mesh: THREE.Group, startPos: THREE.Vector3, endPos: THREE.Vector3, speed = 2.5) {
+  public registerPlatform(mesh: THREE.Group, startPos: THREE.Vector3, endPos: THREE.Vector3, speed = 2.5, rateFactor = 1.0, offset = 0.0) {
     this.platforms.push({
       mesh,
       startPos,
       endPos,
       speed,
-      progress: Math.random(),
+      progress: Math.random() + offset, // Apply initial offset
       direction: 1,
       width: 3.4,
       depth: 3.4,
+      rateFactor,
+      offset,
+      isPlayerOnBoard: false,
     });
   }
 
-  public registerRotatingObstacle(mesh: THREE.Group, centerPos: THREE.Vector3, beamLength = 6.2, speed = 1.8) {
+  public registerRotatingObstacle(mesh: THREE.Group, centerPos: THREE.Vector3, beamLength = 6.2, speed = 1.8, rateFactor = 1.0, offset = 0.0) {
     this.rotatingObstacles.push({
       mesh,
       centerPos,
       beamLength,
       rotationSpeed: speed,
+      rateFactor,
+      offset,
     });
   }
 
@@ -89,7 +100,7 @@ export class ObstacleSystem {
 
     // 1. Update Moving Platforms
     this.platforms.forEach((p) => {
-      p.progress += p.direction * p.speed * 0.15 * dt;
+      p.progress += p.direction * p.speed * p.rateFactor * 0.15 * dt;
       if (p.progress >= 1.0) {
         p.progress = 1.0;
         p.direction = -1;
@@ -102,18 +113,28 @@ export class ObstacleSystem {
       const smoothT = (1 - Math.cos(p.progress * Math.PI)) * 0.5;
       const prevPos = p.mesh.position.clone();
       p.mesh.position.lerpVectors(p.startPos, p.endPos, smoothT);
-
+      
       // Carrier velocity calculation if player is standing on platform
       const deltaPos = p.mesh.position.clone().sub(prevPos);
       const dx = Math.abs(playerPos.x - p.mesh.position.x);
       const dz = Math.abs(playerPos.z - p.mesh.position.z);
       const dy = playerPos.y - p.mesh.position.y;
 
-      if (dx < p.width * 0.5 + 0.3 && dz < p.depth * 0.5 + 0.3 && dy >= 0.1 && dy <= 0.85) {
+      const isTouching = dx < p.width * 0.5 + 0.3 && dz < p.depth * 0.5 + 0.3 && dy >= 0.1 && dy <= 0.85;
+
+      if (isTouching) {
+        // Trigger haptic feedback exactly once upon boarding
+        if (!p.isPlayerOnBoard) {
+          triggerHaptic(Haptics.MEDIUM);
+          p.isPlayerOnBoard = true;
+        }
+
         carriedDelta.add(deltaPos);
         if (isGrounded) {
           playerPos.y = p.mesh.position.y + 0.45;
         }
+      } else {
+        p.isPlayerOnBoard = false;
       }
     });
 
@@ -121,13 +142,16 @@ export class ObstacleSystem {
     this.rotatingObstacles.forEach((ro) => {
       const beamShaft = ro.mesh.getObjectByName('BeamShaft');
       if (beamShaft) {
-        beamShaft.rotation.y = time * ro.rotationSpeed;
+        beamShaft.rotation.y = (time + ro.offset * 10) * ro.rotationSpeed * ro.rateFactor;
 
         // Check hazard collision with player
         const dCenter = Math.hypot(playerPos.x - ro.centerPos.x, playerPos.z - ro.centerPos.z);
         const dY = Math.abs(playerPos.y - (ro.centerPos.y + 1.4));
 
         if (dCenter < ro.beamLength * 0.5 + 0.4 && dY < 0.9) {
+          // Strong tactile feedback for hazard hit
+          triggerHaptic(Haptics.HEAVY);
+
           // Push player outward gently upon collision
           const pushDir = playerPos.clone().sub(ro.centerPos).normalize();
           playerVel.x = pushDir.x * 6.5;
@@ -149,6 +173,9 @@ export class ObstacleSystem {
         if (dist < currentCp.radius) {
           currentCp.reached = true;
           sound.playKeyPickup();
+          
+          // Tactical feedback for checkpoint discovery
+          triggerHaptic(Haptics.SUCCESS);
 
           if (this.onCheckpointReached) {
             this.onCheckpointReached(currentCp, this.courseState.currentCheckpointIndex);
@@ -164,6 +191,9 @@ export class ObstacleSystem {
               : Math.min(this.courseState.bestTime, this.courseState.elapsedTime);
 
             sound.playVictoryFanfare();
+            
+            // Celebration pattern
+            triggerHaptic(Haptics.ALERT);
 
             if (this.onCourseCompleted) {
               this.onCourseCompleted(this.courseState.elapsedTime, 150, 300);

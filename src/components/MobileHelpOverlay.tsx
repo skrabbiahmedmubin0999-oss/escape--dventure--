@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Compass, Sliders, Hand, X, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { sound } from '../audio/soundSystem';
 
 interface MobileHelpOverlayProps {
@@ -25,19 +26,24 @@ export const MobileHelpOverlay: React.FC<MobileHelpOverlayProps> = ({ onDismiss 
   }, [onDismiss]);
 
   return (
-    <div className="absolute inset-x-4 top-16 z-40 flex flex-col items-center pointer-events-none animate-fade-in font-sans">
-      <div className="bg-slate-900/90 border-2 border-amber-500/60 rounded-3xl p-4 sm:p-5 max-w-sm w-full shadow-2xl backdrop-blur-md pointer-events-auto text-slate-100 relative overflow-hidden">
+    <div className="absolute inset-x-4 top-14 sm:top-18 z-[100] flex flex-col items-center pointer-events-none font-sans">
+      <motion.div 
+        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-slate-900/80 backdrop-blur-xl border border-amber-400/40 rounded-3xl p-5 max-w-sm w-full shadow-2xl pointer-events-auto text-slate-100 relative overflow-hidden group"
+      >
         {/* Glow */}
-        <div className="absolute -top-12 -right-12 w-24 h-24 bg-amber-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -top-12 -right-12 w-24 h-24 bg-amber-400/20 rounded-full blur-2xl pointer-events-none group-hover:bg-amber-400/30 transition-colors" />
 
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-400/30 text-amber-400">
-              <Compass className="w-5 h-5 animate-spin" style={{ animationDuration: '6s' }} />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-400/20 border border-amber-400/30 text-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.1)]">
+              <Compass className="w-5 h-5 animate-spin-slow" />
             </div>
             <div>
-              <h3 className="text-sm font-black tracking-tight text-white">Touch Controls Guide</h3>
-              <p className="text-[10px] text-amber-400 font-bold">Auto-hides in {timeLeft}s</p>
+              <h3 className="text-sm font-black tracking-tight text-white uppercase">Neural Interface</h3>
+              <p className="text-[10px] text-amber-400 font-bold uppercase tracking-widest">Auto-hides: {timeLeft}s</p>
             </div>
           </div>
           <button
@@ -45,25 +51,25 @@ export const MobileHelpOverlay: React.FC<MobileHelpOverlayProps> = ({ onDismiss 
               sound.playClick();
               onDismiss();
             }}
-            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer group/close"
             aria-label="Dismiss"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 group-hover/close:rotate-90 transition-transform" />
           </button>
         </div>
 
-        <div className="space-y-2 text-xs text-slate-300 font-medium mb-3">
-          <div className="flex items-center gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 font-bold">1</div>
-            <div>
-              <span className="font-bold text-white">Virtual Joystick:</span> Drag bottom-left thumbstick to move around.
+        <div className="space-y-3 mb-5">
+          <div className="flex items-center gap-3 bg-black/40 p-3 rounded-2xl border border-white/5 group/item hover:border-amber-400/30 transition-colors">
+            <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0 font-mono text-xs font-black">01</div>
+            <div className="text-[11px] leading-relaxed">
+              <span className="font-black text-white uppercase tracking-tight">Kinetic Stick:</span> Drag bottom-left region to navigate coordinates.
             </div>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 font-bold">2</div>
-            <div>
-              <span className="font-bold text-white">Custom Layouts:</span> Open <strong className="text-amber-400">Settings</strong> to reposition & resize buttons!
+          <div className="flex items-center gap-3 bg-black/40 p-3 rounded-2xl border border-white/5 group/item hover:border-amber-400/30 transition-colors">
+            <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400 shrink-0 font-mono text-xs font-black">02</div>
+            <div className="text-[11px] leading-relaxed">
+              <span className="font-black text-white uppercase tracking-tight">Calibration:</span> Open <strong className="text-amber-400">Settings</strong> to resize & remap interface.
             </div>
           </div>
         </div>
@@ -73,19 +79,20 @@ export const MobileHelpOverlay: React.FC<MobileHelpOverlayProps> = ({ onDismiss 
             sound.playClick();
             onDismiss();
           }}
-          className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider text-center transition-all shadow-lg cursor-pointer active:scale-95 flex items-center justify-center"
+          className="w-full min-h-[46px] py-2.5 px-4 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-[0.3em] transition-all shadow-[0_0_20px_rgba(251,191,36,0.2)] cursor-pointer active:scale-95"
         >
-          Got It, Let's Play!
+          Initialize Mission
         </button>
 
         {/* Progress Bar */}
-        <div className="w-full bg-slate-800 h-1 rounded-full mt-3 overflow-hidden">
+        <div className="w-full bg-black/40 h-1 rounded-full mt-4 overflow-hidden p-px border border-white/5">
           <div
-            className="bg-amber-500 h-full transition-all duration-1000 ease-linear"
+            className="bg-gradient-to-r from-amber-600 to-amber-400 h-full transition-all duration-1000 ease-linear shadow-[0_0_5px_rgba(251,191,36,0.5)]"
             style={{ width: `${(timeLeft / 10) * 100}%` }}
           />
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
+

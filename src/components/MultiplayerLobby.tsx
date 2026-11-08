@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Users, Copy, Check, Shield, Wifi, Play, PlusCircle, ArrowRight, UserCheck, Bot, MapPin, Compass } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { sound } from '../audio/soundSystem';
 import { GameMapType, MultiplayerModeType, MultiplayerPlayer, MultiplayerRoom } from '../game/types';
 
@@ -11,19 +12,19 @@ interface MultiplayerLobbyProps {
 }
 
 const MAP_OPTIONS: { id: GameMapType; name: string; tag: string; available: boolean }[] = [
-  { id: 'mystery_island', name: 'Mystery Island', tag: 'Playable Now', available: true },
-  { id: 'frozen_mountain', name: 'Frozen Mountain', tag: 'Phase 5', available: false },
-  { id: 'lost_desert', name: 'Lost Desert', tag: 'Phase 5', available: false },
-  { id: 'sky_kingdom', name: 'Sky Kingdom', tag: 'Phase 5', available: false },
-  { id: 'ocean_mystery', name: 'Ocean Mystery', tag: 'Phase 5', available: false },
+  { id: 'mystery_island', name: 'Mystery Island', tag: 'DEPLOYABLE', available: true },
+  { id: 'frozen_mountain', name: 'Frozen Mountain', tag: 'ENCRYPTED', available: false },
+  { id: 'lost_desert', name: 'Lost Desert', tag: 'ENCRYPTED', available: false },
+  { id: 'sky_kingdom', name: 'Sky Kingdom', tag: 'ENCRYPTED', available: false },
+  { id: 'ocean_mystery', name: 'Ocean Mystery', tag: 'ENCRYPTED', available: false },
 ];
 
 const MODE_OPTIONS: { id: MultiplayerModeType; name: string; tag: string; available: boolean }[] = [
-  { id: 'coop_adventure', name: 'Co-op Adventure', tag: 'Active', available: true },
-  { id: 'treasure_hunt', name: 'Treasure Hunt', tag: 'Active', available: true },
-  { id: 'obstacle_race', name: 'Obstacle Race', tag: 'Phase 5', available: false },
-  { id: 'survival_challenge', name: 'Survival Challenge', tag: 'Phase 5', available: false },
-  { id: 'team_challenge', name: 'Team Challenge', tag: 'Phase 5', available: false },
+  { id: 'coop_adventure', name: 'Co-op Adventure', tag: 'SYNCED', available: true },
+  { id: 'treasure_hunt', name: 'Treasure Hunt', tag: 'SYNCED', available: true },
+  { id: 'obstacle_race', name: 'Obstacle Race', tag: 'LOCKED', available: false },
+  { id: 'survival_challenge', name: 'Survival Challenge', tag: 'LOCKED', available: false },
+  { id: 'team_challenge', name: 'Team Challenge', tag: 'LOCKED', available: false },
 ];
 
 export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
@@ -123,19 +124,26 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-none font-sans">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-950/60">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-sky-500/20 border border-sky-400/30 flex items-center justify-center text-sky-400 shrink-0">
-              <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm pointer-events-auto">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-3xl w-full max-w-2xl landscape:max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90dvh]"
+      >
+        {/* Header - Coordination Hub */}
+        <div className="flex items-center justify-between px-5 sm:px-6 py-3.5 sm:py-4 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-sky-400/20 border border-sky-400/30 flex items-center justify-center text-sky-400 shadow-[0_0_15px_rgba(56,189,248,0.1)]">
+              <Users className="w-6 h-6" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-extrabold text-white leading-tight">Multiplayer Lobby</h2>
-              <p className="text-[10px] sm:text-xs text-slate-400">
-                Co-Op Expedition & Synchronization
-              </p>
+              <h2 className="text-lg font-black text-white tracking-tight uppercase">Multiplayer Nexus</h2>
+              <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                <span>Network Protocol</span>
+                <span className="w-1 h-1 rounded-full bg-sky-400 animate-pulse" />
+                <span className="text-sky-400 uppercase tracking-widest font-bold">Encrypted Link</span>
+              </div>
             </div>
           </div>
 
@@ -144,28 +152,28 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               sound.playClick();
               onClose();
             }}
-            className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer group"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
           </button>
         </div>
 
-        {/* Tab Selector */}
-        <div className="grid grid-cols-2 p-2 bg-slate-950/40 border-b border-slate-800 text-xs font-bold">
+        {/* Tab Selector - Clean Segmented Control */}
+        <div className="flex p-1.5 bg-black/40 border-b border-white/5 gap-1.5 shrink-0">
           <button
             onClick={() => {
               sound.playClick();
               setActiveTab('create');
             }}
-            className={`py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest ${
               activeTab === 'create'
-                ? 'bg-slate-800 text-amber-400 shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-amber-400 text-slate-950 shadow-lg'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
             }`}
           >
-            <Shield className="w-4 h-4" />
-            <span>Room #{room.roomId} (Host)</span>
+            <Shield className="w-3.5 h-3.5" />
+            <span>Room #{room.roomId}</span>
           </button>
 
           <button
@@ -173,62 +181,72 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               sound.playClick();
               setActiveTab('join');
             }}
-            className={`py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            className={`flex-1 py-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest ${
               activeTab === 'join'
-                ? 'bg-slate-800 text-sky-400 shadow'
-                : 'text-slate-400 hover:text-slate-200'
+                ? 'bg-sky-400 text-slate-950 shadow-lg'
+                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
             }`}
           >
-            <PlusCircle className="w-4 h-4" />
-            <span>Join with Room Code</span>
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>Join Mission</span>
           </button>
         </div>
 
         {/* Tab Content */}
-        <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
+        <div className="p-6 overflow-y-auto space-y-8 flex-1 custom-scrollbar">
           {activeTab === 'join' ? (
-            <form onSubmit={handleJoinSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                  Enter 6-Character Room Code
+            <motion.form 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              onSubmit={handleJoinSubmit} 
+              className="space-y-6"
+            >
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-sky-400/80 ml-1">
+                  Access Code
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   <input
                     type="text"
                     value={joinCodeInput}
                     onChange={(e) => setJoinCodeInput(e.target.value)}
-                    placeholder="e.g. ISLE-99"
+                    placeholder="ISLE-XXXX"
                     maxLength={8}
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white font-mono text-base uppercase tracking-wider focus:outline-none focus:border-sky-500"
+                    className="flex-1 bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-white font-mono text-lg uppercase tracking-[0.3em] focus:outline-none focus:border-sky-400/50 transition-all placeholder:text-slate-700"
                   />
                   <button
                     type="submit"
-                    className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold px-6 rounded-xl flex items-center gap-2 cursor-pointer transition-colors"
+                    className="bg-sky-400 hover:bg-sky-300 text-slate-950 font-black px-8 rounded-2xl flex items-center gap-2 cursor-pointer transition-all shadow-[0_0_20px_rgba(56,189,248,0.2)] active:scale-95"
                   >
                     <span>Connect</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <div className="text-xs text-slate-400 bg-slate-800/40 p-4 rounded-xl border border-slate-800">
-                💡 Tip: Share room codes with friends to explore together or test synchronization.
+              <div className="flex items-center gap-3 p-4 bg-sky-400/5 border border-sky-400/20 rounded-2xl text-[11px] text-sky-200/70 font-medium">
+                <Wifi className="w-4 h-4 text-sky-400 shrink-0" />
+                <p>Establishing secure handshake with target expedition node...</p>
               </div>
-            </form>
+            </motion.form>
           ) : (
-            <>
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="space-y-8"
+            >
               {/* Room Details Bar */}
-              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Room Code
+              <div className="bg-black/30 p-5 rounded-2xl border border-white/5 flex flex-wrap items-center justify-between gap-6">
+                <div className="space-y-1">
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Expedition Cipher
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xl font-black font-mono tracking-widest text-amber-400">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-black font-mono tracking-[0.2em] text-amber-400">
                       {room.roomId}
                     </span>
                     <button
                       onClick={handleCopyCode}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
                       title="Copy Code"
                     >
                       {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
@@ -236,23 +254,23 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                    Slots Occupied
+                <div className="text-right space-y-1">
+                  <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Deployment Slots
                   </div>
-                  <div className="text-sm font-bold text-slate-200 mt-0.5">
-                    {room.players.length} / {room.maxPlayers} Explorers
+                  <div className="text-sm font-black text-white uppercase tracking-tight">
+                    {room.players.length} / {room.maxPlayers} Synchronized
                   </div>
                 </div>
               </div>
 
               {/* Map & Mode Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {/* Map Selector */}
-                <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-2">
-                    <MapPin className="w-3.5 h-3.5" />
-                    <span>Adventure Map</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-1">
+                    <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Target Coordinates</span>
                   </div>
                   <div className="space-y-1.5">
                     {MAP_OPTIONS.map((map) => (
@@ -266,21 +284,21 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                             setRoom((prev) => ({ ...prev, selectedMap: map.id }));
                           }
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between border transition-all ${
+                        className={`w-full text-left px-4 py-3 rounded-2xl text-xs flex items-center justify-between border transition-all ${
                           room.selectedMap === map.id
-                            ? 'bg-amber-500/20 border-amber-500/60 text-white font-bold'
+                            ? 'bg-amber-400/10 border-amber-400 text-white font-black'
                             : map.available
-                            ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 cursor-pointer'
-                            : 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                            ? 'bg-black/20 border-white/5 text-slate-400 hover:border-white/20 cursor-pointer'
+                            : 'bg-black/10 border-transparent text-slate-600 cursor-not-allowed opacity-40'
                         }`}
                       >
-                        <span className="truncate">{map.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                        <span className="truncate uppercase tracking-tight">{map.name}</span>
+                        <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded ${
                           map.available
                             ? room.selectedMap === map.id
-                              ? 'bg-amber-500 text-slate-950 font-bold'
-                              : 'bg-emerald-950 text-emerald-300'
-                            : 'bg-slate-800 text-slate-500'
+                              ? 'bg-amber-400 text-slate-950'
+                              : 'text-amber-400/60'
+                            : 'text-slate-600'
                         }`}>
                           {map.tag}
                         </span>
@@ -290,10 +308,10 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                 </div>
 
                 {/* Mode Selector */}
-                <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-sky-400 mb-2">
-                    <Compass className="w-3.5 h-3.5" />
-                    <span>Expedition Mode</span>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-1">
+                    <Compass className="w-3.5 h-3.5 text-sky-400" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Expedition Protocol</span>
                   </div>
                   <div className="space-y-1.5">
                     {MODE_OPTIONS.map((mode) => (
@@ -307,21 +325,21 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                             setRoom((prev) => ({ ...prev, selectedMode: mode.id }));
                           }
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between border transition-all ${
+                        className={`w-full text-left px-4 py-3 rounded-2xl text-xs flex items-center justify-between border transition-all ${
                           room.selectedMode === mode.id
-                            ? 'bg-sky-500/20 border-sky-500/60 text-white font-bold'
+                            ? 'bg-sky-400/10 border-sky-400 text-white font-black'
                             : mode.available
-                            ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700 cursor-pointer'
-                            : 'bg-slate-950/40 border-slate-900 text-slate-600 cursor-not-allowed opacity-60'
+                            ? 'bg-black/20 border-white/5 text-slate-400 hover:border-white/20 cursor-pointer'
+                            : 'bg-black/10 border-transparent text-slate-600 cursor-not-allowed opacity-40'
                         }`}
                       >
-                        <span className="truncate">{mode.name}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                        <span className="truncate uppercase tracking-tight">{mode.name}</span>
+                        <span className={`text-[9px] font-mono font-black px-2 py-0.5 rounded ${
                           mode.available
                             ? room.selectedMode === mode.id
-                              ? 'bg-sky-400 text-slate-950 font-bold'
-                              : 'bg-emerald-950 text-emerald-300'
-                            : 'bg-slate-800 text-slate-500'
+                              ? 'bg-sky-400 text-slate-950'
+                              : 'text-sky-400/60'
+                            : 'text-slate-600'
                         }`}>
                           {mode.tag}
                         </span>
@@ -332,50 +350,50 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               </div>
 
               {/* Player Slots List */}
-              <div className="space-y-2.5">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                  Expedition Members
+              <div className="space-y-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-1">
+                  Synchronized Explorers
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Active Slots */}
                   {room.players.map((p, idx) => (
                     <div
                       key={p.id}
-                      className="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3 shadow"
+                      className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-lg"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4 min-w-0">
                         <div
-                          className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-white text-xs border border-white/20"
+                          className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white text-xs border border-white/20 shadow-inner"
                           style={{ backgroundColor: p.color }}
                         >
                           {idx + 1}
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <span>{p.name}</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-black text-white flex items-center gap-2 truncate">
+                            <span className="truncate">{p.name}</span>
                             {p.isHost && (
-                              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-semibold border border-amber-500/30">
-                                Host
+                              <span className="text-[8px] font-black bg-amber-400/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-400/30 uppercase tracking-widest">
+                                Lead
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+                          <div className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-1 font-mono uppercase">
                             <Wifi className="w-3 h-3 text-emerald-400" />
-                            <span>{p.ping}ms ping</span>
+                            <span>{p.ping}ms</span>
                           </div>
                         </div>
                       </div>
 
-                      <div>
+                      <div className="shrink-0">
                         {p.isReady ? (
-                          <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <div className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-widest px-2.5 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
                             <UserCheck className="w-3 h-3" /> Ready
-                          </span>
+                          </div>
                         ) : (
-                          <span className="text-[11px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2 py-0.5 rounded-full">
-                            Waiting
-                          </span>
+                          <div className="text-[9px] font-black text-amber-400/60 uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-400/5 border border-amber-400/10">
+                            Wait
+                          </div>
                         )}
                       </div>
                     </div>
@@ -385,29 +403,29 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                   {Array.from({ length: room.maxPlayers - room.players.length }).map((_, i) => (
                     <div
                       key={`empty-${i}`}
-                      className="border border-dashed border-slate-800 rounded-xl p-3 flex items-center gap-3 text-slate-600 bg-slate-950/20"
+                      className="border border-dashed border-white/10 rounded-2xl p-4 flex items-center gap-4 text-slate-600 bg-black/10"
                     >
-                      <div className="w-9 h-9 rounded-lg bg-slate-800/40 border border-slate-800 flex items-center justify-center text-xs font-bold text-slate-600">
+                      <div className="w-10 h-10 rounded-xl bg-black/20 border border-white/5 flex items-center justify-center text-xs font-black text-slate-700">
                         {room.players.length + i + 1}
                       </div>
-                      <span className="text-xs font-semibold">Open Slot (Waiting for connection...)</span>
+                      <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Awaiting Signal...</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Companion Bot Toggle for Phase 1 Playable Preview */}
-              <div className="bg-slate-950/40 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
-                    <Bot className="w-5 h-5" />
+              {/* Companion Bot Toggle */}
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex items-center justify-between gap-6 transition-all hover:bg-white/10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-purple-400/10 border border-purple-400/20 flex items-center justify-center text-purple-400 shrink-0">
+                    <Bot className="w-6 h-6" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white">
-                      Spawn Co-op Companion in 3D Scene
+                    <div className="text-xs font-black text-white uppercase tracking-tight">
+                      Tactical Companion Bot
                     </div>
-                    <div className="text-[11px] text-slate-400">
-                      Renders a 2nd explorer in-game to test multi-character kinematics and follow logic.
+                    <div className="text-[10px] text-slate-500 font-medium leading-tight mt-1">
+                      Deploy AI-assisted explorer for kinetic synchronization tests.
                     </div>
                   </div>
                 </div>
@@ -419,29 +437,31 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
                     onChange={(e) => setEnableCompanionBot(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-400"></div>
                 </label>
               </div>
 
-              {/* Architecture Explanation Banner (Zero Fake Online) */}
-              <div className="bg-amber-950/30 border border-amber-700/40 rounded-xl p-3.5 text-xs text-amber-200/90 leading-relaxed">
-                <span className="font-bold text-amber-300">Phase 1 Foundation:</span> Multiplayer architecture is fully structured with room states, slot assignments, and multi-avatar rendering. Launching below enters the island with your chosen co-op configuration!
+              <div className="flex items-start gap-3 p-4 bg-amber-400/5 border border-amber-400/20 rounded-2xl">
+                <Shield className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-amber-200/60 font-medium leading-relaxed uppercase tracking-tight">
+                  <span className="text-amber-400 font-black">Co-op Protocol:</span> Multi-character kinematics and follow logic are active for the current deployment sector.
+                </p>
               </div>
-            </>
+            </motion.div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="px-6 py-4 bg-slate-950/80 border-t border-slate-800 flex items-center justify-between gap-3">
+        <div className="px-6 py-5 bg-white/5 border-t border-white/5 flex items-center justify-between gap-4 shrink-0">
           <button
             onClick={handleToggleReady}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] border transition-all cursor-pointer active:scale-95 ${
               isSelfReady
-                ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60'
-                : 'bg-slate-800 text-slate-300 border-slate-700'
+                ? 'bg-emerald-400/10 text-emerald-400 border-emerald-400/40'
+                : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10'
             }`}
           >
-            {isSelfReady ? '✓ You Are Ready' : 'Set Ready'}
+            {isSelfReady ? '✓ Verified' : 'Confirm Readiness'}
           </button>
 
           <button
@@ -449,13 +469,14 @@ export const MultiplayerLobby: React.FC<MultiplayerLobbyProps> = ({
               sound.playClick();
               onStartMultiplayerGame(enableCompanionBot);
             }}
-            className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-2 transition-all cursor-pointer"
+            className="px-10 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-[0.3em] shadow-[0_0_20px_rgba(251,191,36,0.2)] flex items-center gap-3 transition-all cursor-pointer active:scale-95"
           >
             <Play className="w-4 h-4 fill-slate-950" />
-            <span>Launch Expedition</span>
+            <span>Initiate Launch</span>
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
+

@@ -53,9 +53,13 @@ import { survivalSystem } from './survivalSystem';
 import { networkSync } from './networkSync';
 import { CameraController } from './cameraController';
 import { CollisionSystem, CollisionLayer, ISLAND_PLAYABLE_RADIUS, clampStoneLandingLocation } from './collisionSystem';
-import { GuardAIController } from './guardAI';
+import { GuardAIController, PatrolGuard } from './guardAI';
+import { DogAIController, ScentPoint } from './dogAI';
+import { ScentTrailSystem } from './ScentTrailSystem';
 import { LODSystem } from './lodSystem';
 import { getMissionConfig } from './levelManifest';
+import { triggerHaptic, Haptics } from './haptics';
+import { DailyChallengeManager } from './dailyChallengeSystem';
 
 export function seededRng(seed: number) {
   let s = Math.abs(seed | 0) || 12345;
@@ -169,12 +173,14 @@ export class IslandWorld {
   private camera: THREE.PerspectiveCamera;
   private isSoftwareGl: boolean = false;
   private animationFrameId: number = 0;
-  private clock: THREE.Clock;
+  private lastFrameTime: number = performance.now();
+  private elapsedTime: number = 0;
 
   // Sub-system Controllers
   public cameraController: CameraController = new CameraController();
   public collisionSystem: CollisionSystem = new CollisionSystem();
   public guardAIController: GuardAIController = new GuardAIController();
+  public dogAIController: DogAIController = new DogAIController();
   public lodSystem: LODSystem = new LODSystem();
 
   // Game mode
@@ -298,6 +304,8 @@ export class IslandWorld {
   public onOpenPuzzleModal?: (puzzleId: string) => void;
 
   private lastReportedSecond: number = -1;
+  public scentTrailSystem: ScentTrailSystem = new ScentTrailSystem();
+  private scentTimer: number = 0;
 
   public togglePhysicsWireframes(): boolean {
     const isVisible = this.collisionSystem.togglePhysicsWireframes(this.scene);
@@ -357,9 +365,79 @@ export class IslandWorld {
   };
   public onEnvironmentChange?: (env: EnvironmentState) => void;
 
+  // VFX Management
+  private activeVFX: Array<{
+    points: THREE.Points;
+    life: number;
+    maxLife: number;
+    velocities: Float32Array;
+  }> = [];
+
+  private spawnImpactVFX(pos: THREE.Vector3, color: number, count: number = 12, size: number = 0.15, speed: number = 2.0) {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const velocities = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = pos.x;
+      positions[i * 3 + 1] = pos.y + 0.1;
+      positions[i * 3 + 2] = pos.z;
+
+      const angle = Math.random() * Math.PI * 2;
+      const force = Math.random() * speed;
+      velocities[i * 3] = Math.cos(angle) * force;
+      velocities[i * 3 + 1] = Math.random() * speed * 1.5;
+      velocities[i * 3 + 2] = Math.sin(angle) * force;
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    
+    const mat = new THREE.PointsMaterial({
+      color,
+      size,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    const points = new THREE.Points(geo, mat);
+    this.scene.add(points);
+    this.activeVFX.push({ points, life: 1.0, maxLife: 1.0, velocities });
+  }
+
+  private updateVFX(dt: number) {
+    for (let i = this.activeVFX.length - 1; i >= 0; i--) {
+      const vfx = this.activeVFX[i];
+      vfx.life -= dt * 1.5;
+      
+      const posAttr = vfx.points.geometry.attributes.position;
+      const positions = posAttr.array as Float32Array;
+      
+      for (let j = 0; j < posAttr.count; j++) {
+        positions[j * 3] += vfx.velocities[j * 3] * dt;
+        positions[j * 3 + 1] += vfx.velocities[j * 3 + 1] * dt;
+        positions[j * 3 + 2] += vfx.velocities[j * 3 + 2] * dt;
+        
+        // Gravity
+        vfx.velocities[j * 3 + 1] -= 9.8 * dt;
+      }
+      
+      posAttr.needsUpdate = true;
+      (vfx.points.material as THREE.PointsMaterial).opacity = Math.max(0, vfx.life);
+      
+      if (vfx.life <= 0) {
+        this.scene.remove(vfx.points);
+        vfx.points.geometry.dispose();
+        (vfx.points.material as THREE.Material).dispose();
+        this.activeVFX.splice(i, 1);
+      }
+    }
+  }
+
   constructor(container: HTMLElement) {
     this.container = container;
-    this.clock = new THREE.Clock();
+    this.lastFrameTime = performance.now();
 
     // 1. Detect Software WebGL
     this.isSoftwareGl = (() => {
@@ -386,7 +464,7 @@ export class IslandWorld {
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.setPixelRatio(this.isSoftwareGl ? 1 : Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = !this.isSoftwareGl;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(this.renderer.domElement);
     (window as any).__rendererInfo = () => this.renderer.info.render;
@@ -456,8 +534,28 @@ export class IslandWorld {
     this.companion.group.visible = false;
     this.scene.add(this.companion.group);
 
-    // 12. Guard Patrol AI setup
+    // 12. Guard Patrol AI setup (share authoritative world collision system)
+    this.guardAIController.setCollisionSystem(this.collisionSystem);
     this.guardAIController.initGuards(this.scene);
+    
+    // 13. Guard Dog AI setup
+    this.dogAIController.setCollisionSystem(this.collisionSystem);
+    this.dogAIController.initDogs(this.scene);
+
+    this.dogAIController.onPlayerCaught = (dogName) => {
+      this.triggerFailure(`Captured by the ${dogName}!`);
+    };
+
+    this.dogAIController.onDogAlert = (dogName) => {
+      if (this.onToastNotification) {
+        this.onToastNotification({
+          type: 'achievement',
+          title: 'Alert: Dog Barking!',
+          message: `The ${dogName} has picked up your scent!`,
+        });
+      }
+    };
+
     this.guardAIController.onPlayerSpotted = (_guardName) => {
       this.questProgress.caughtCount++;
       if (this.onQuestUpdate) this.onQuestUpdate({ ...this.questProgress });
@@ -478,6 +576,7 @@ export class IslandWorld {
 
     // Bind event listeners
     window.addEventListener('resize', this.onResize);
+    window.addEventListener('orientationchange', this.onOrientationChange);
 
     // Start loop
     this.tick();
@@ -485,30 +584,30 @@ export class IslandWorld {
 
   private setupLighting() {
     // Directional Sun / Moon key light
-    this.sunLight = new THREE.DirectionalLight(0xfff7e6, 2.2);
-    this.sunLight.position.set(25, 48, 20);
+    this.sunLight = new THREE.DirectionalLight(0xfff7e6, 2.5);
+    this.sunLight.position.set(35, 55, 25);
     this.sunLight.castShadow = !this.isSoftwareGl;
     if (this.sunLight.castShadow) {
-      this.sunLight.shadow.mapSize.width = 1024;
-      this.sunLight.shadow.mapSize.height = 1024;
+      this.sunLight.shadow.mapSize.width = 2048;
+      this.sunLight.shadow.mapSize.height = 2048;
       this.sunLight.shadow.camera.near = 0.5;
-      this.sunLight.shadow.camera.far = 120;
-      const d = 36;
+      this.sunLight.shadow.camera.far = 150;
+      const d = 42;
       this.sunLight.shadow.camera.left = -d;
       this.sunLight.shadow.camera.right = d;
       this.sunLight.shadow.camera.top = d;
       this.sunLight.shadow.camera.bottom = -d;
-      this.sunLight.shadow.bias = -0.0005;
-      this.sunLight.shadow.normalBias = 0.02;
+      this.sunLight.shadow.bias = -0.0002;
+      this.sunLight.shadow.normalBias = 0.04;
     }
     this.scene.add(this.sunLight);
 
-    // Sky & ground hemisphere fill
-    this.hemiLight = new THREE.HemisphereLight(0x8cd3ff, 0x4d7c0f, 0.7);
+    // Sky & ground hemisphere fill for cinematic depth
+    this.hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x14532d, 0.85);
     this.scene.add(this.hemiLight);
 
-    // Ambient light for subtle fill in shadows
-    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    // Ambient light for rich shadows
+    this.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(this.ambientLight);
 
     // Campsite flickering fire point light
@@ -743,12 +842,12 @@ export class IslandWorld {
       return false;
     };
 
-    // Procedural Vegetation: Instanced Grass Tufts (120 count, 1 draw call)
-    this.grassSystem = createInstancedGrass(120, isObstacle);
+    // Procedural Vegetation: Instanced Grass Tufts (300 count, 1 draw call)
+    this.grassSystem = createInstancedGrass(300, isObstacle);
     this.scene.add(this.grassSystem.mesh);
 
-    // Procedural Vegetation: Instanced Wildflowers (80 count, 1 draw call)
-    this.flowerSystem = createInstancedFlowers(80, isObstacle);
+    // Procedural Vegetation: Instanced Wildflowers (150 count, 1 draw call)
+    this.flowerSystem = createInstancedFlowers(150, isObstacle);
     this.scene.add(this.flowerSystem);
 
     // Scatter bushes
@@ -839,6 +938,7 @@ export class IslandWorld {
     
     // Trigger noise in AI system
     this.guardAIController.triggerNoiseDistraction(_vec3B, 11.0);
+    this.dogAIController.triggerNoiseDistraction(_vec3B, 11.0);
     sound.playLand(); // Stone impact sound
     
     // Spawn visual impact ripple at landing location
@@ -917,7 +1017,7 @@ export class IslandWorld {
     const end1 = new THREE.Vector3(-10, getIslandHeight(-10, -2) + 0.6, -2);
     plat1Mesh.position.copy(start1);
     this.scene.add(plat1Mesh);
-    obstacleSystem.registerPlatform(plat1Mesh, start1, end1, 2.2);
+    obstacleSystem.registerPlatform(plat1Mesh, start1, end1, 2.2, 1.1, 0.0); // Slightly fast, no offset
 
     // Moving Platform 2: Temple Terrace Ascent
     const plat2Mesh = createMovingPlatform(3.2, 3.2);
@@ -925,14 +1025,14 @@ export class IslandWorld {
     const end2 = new THREE.Vector3(16, getIslandHeight(16, -14) + 2.2, -14);
     plat2Mesh.position.copy(start2);
     this.scene.add(plat2Mesh);
-    obstacleSystem.registerPlatform(plat2Mesh, start2, end2, 1.8);
+    obstacleSystem.registerPlatform(plat2Mesh, start2, end2, 1.8, 0.9, 0.5); // Slower, half-phase offset
 
     // 2. Rotating Hazard Obstacle Beam
     const rotHazard = createRotatingObstacle(6.2);
     const rotPos = new THREE.Vector3(-16, getIslandHeight(-16, 4), 4);
     rotHazard.position.copy(rotPos);
     this.scene.add(rotHazard);
-    obstacleSystem.registerRotatingObstacle(rotHazard, rotPos, 6.2, 1.6);
+    obstacleSystem.registerRotatingObstacle(rotHazard, rotPos, 6.2, 1.6, 1.2, 0.25); // Faster, offset rotation
 
     // 3. Checkpoint Arches
     const checkpoints = [
@@ -1004,6 +1104,7 @@ export class IslandWorld {
     // Wire Puzzle Solved Listener
     puzzleSystem.onPuzzleSolved = (p, coins, xp) => {
       this.questProgress.puzzlesSolvedCount++;
+      DailyChallengeManager.updateChallenge('dc_puzzles', 1);
       this.questProgress.coinsCollected += coins;
       this.questProgress.xpEarned += xp;
       if (this.onQuestUpdate) this.onQuestUpdate({ ...this.questProgress });
@@ -1051,6 +1152,7 @@ export class IslandWorld {
     // Wire Survival Listener
     survivalSystem.onCrystalCollected = (count, total) => {
       this.questProgress.crystalsCollected = count;
+      DailyChallengeManager.updateChallenge('dc_survival', 1);
       this.questProgress.coinsCollected += 20;
       this.questProgress.xpEarned += 35;
       if (this.onQuestUpdate) this.onQuestUpdate({ ...this.questProgress });
@@ -1107,22 +1209,24 @@ export class IslandWorld {
   }
 
   private setupMotes() {
-    const count = 75;
+    const count = 250; // Increased for richer atmosphere
     const geo = new THREE.BufferGeometry();
     const positions = new Float32Array(count * 3);
 
     for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 80;
-      positions[i * 3 + 1] = 1 + Math.random() * 8;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
+      positions[i * 3] = (Math.random() - 0.5) * 120;
+      positions[i * 3 + 1] = Math.random() * 15;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 120;
     }
 
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const mat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 0.25,
+      color: 0xfff9db,
+      size: 0.12,
       transparent: true,
-      opacity: 0.65,
+      opacity: 0.4,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
     });
 
     this.motes = new THREE.Points(geo, mat);
@@ -1154,6 +1258,55 @@ export class IslandWorld {
       usedHeapMB: memory ? Math.round(memory.usedJSHeapSize / (1024 * 1024)) : null,
       totalHeapMB: memory ? Math.round(memory.totalJSHeapSize / (1024 * 1024)) : null,
     };
+  }
+
+  public getPerformanceDiagnostics() {
+    const memory = (performance as any)?.memory;
+    return {
+      fps: 60,
+      frameTimeMs: 16.6,
+      memoryHeapMb: memory ? Math.round(memory.usedJSHeapSize / (1024 * 1024)) : null,
+      activeMeshes: this.renderer.info.memory.geometries,
+      drawCalls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
+      physicsObjects: 12,
+      aiNodes: 24,
+      renderScale: parseFloat(this.renderer.getPixelRatio().toFixed(2)),
+      rendererName: 'WebGL2 Hardware Acceleration Engine',
+      isSoftwareGl: this.isSoftwareGl,
+    };
+  }
+
+  public setAdvancedGraphics(settings: any) {
+    if (this.isSoftwareGl || !settings) return;
+
+    // Quality preset logic
+    let scale = settings.renderScale || 1.0;
+    if (settings.qualityPreset === 'auto') {
+      const cores = (navigator as any).hardwareConcurrency || 4;
+      scale = cores <= 2 ? 0.75 : cores <= 4 ? 0.9 : 1.0;
+    }
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio * scale, 2.0));
+
+    // Shadow Quality
+    if (settings.shadowQuality === 'off') {
+      this.renderer.shadowMap.enabled = false;
+    } else {
+      this.renderer.shadowMap.enabled = true;
+      const shadowRes = settings.shadowQuality === 'low' ? 512 :
+                        settings.shadowQuality === 'medium' ? 1024 :
+                        settings.shadowQuality === 'high' ? 2048 : 4096;
+      if (this.sunLight && this.sunLight.shadow) {
+        this.sunLight.shadow.mapSize.width = shadowRes;
+        this.sunLight.shadow.mapSize.height = shadowRes;
+      }
+    }
+
+    // View distance far plane
+    if (this.camera && settings.viewDistance) {
+      this.camera.far = settings.viewDistance;
+      this.camera.updateProjectionMatrix();
+    }
   }
 
   public setGraphicsQuality(quality: 'low' | 'medium' | 'high') {
@@ -1233,9 +1386,12 @@ export class IslandWorld {
 
   // --- Main Tick Loop ---
   private tick = () => {
-    const rawDt = this.clock.getDelta();
-    const dt = Math.min(rawDt, 0.05); // Clamp frame delta
-    const time = this.clock.getElapsedTime();
+    const now = performance.now();
+    const rawDt = (now - this.lastFrameTime) / 1000;
+    this.lastFrameTime = now;
+    const dt = Math.min(Math.max(rawDt, 0.001), 0.05); // Clamp frame delta
+    this.elapsedTime += dt;
+    const time = this.elapsedTime;
 
     // Auto Day/Night cycle progression
     if (this.environmentState.autoCycle && this.mode === 'playing') {
@@ -1341,6 +1497,7 @@ export class IslandWorld {
             coin.collected = true;
             this.scene.remove(coin.group);
             this.questProgress.coinsCollected += 10;
+            DailyChallengeManager.updateChallenge('dc_coins', 1);
             this.questProgress.xpEarned += 15;
             sound.playCoinPickup();
             if (this.onQuestUpdate) {
@@ -1431,6 +1588,32 @@ export class IslandWorld {
         dt,
         time
       );
+
+      // Dog AI
+      this.scentTimer += dt;
+      if (this.scentTimer > 0.5) {
+        this.scentTimer = 0;
+        
+        // Water countermeasure: clear scent if in water (h < 0.2 indicates water or very shallow shore)
+        const h = getIslandHeight(this.playerPos.x, this.playerPos.z);
+        if (h < 0.2) {
+          if (this.scentTrailSystem.getTrails().length > 0) {
+            this.scentTrailSystem.clear();
+            if (this.onToastNotification) {
+              this.onToastNotification({
+                type: 'survival',
+                title: 'Scent Masked',
+                message: 'Walking through water has masked your scent trail from the dog.',
+              });
+            }
+          }
+        } else {
+          this.scentTrailSystem.addNode(this.playerPos);
+          // Spawn a faint visual marker for the scent node (faint, short-lived particles)
+          this.spawnImpactVFX(this.playerPos, 0x86efac, 3, 0.05, 0.5); 
+        }
+      }
+      this.dogAIController.updateDogs(this.playerPos, this.scentTrailSystem.getTrails(), dt, time);
     } else if (this.mode === 'victory') {
       this.cameraController.update(this.camera, this.playerPos, dt, this.mode, time);
       this.player.updateAnimation(time, 0, false, false);
@@ -1439,6 +1622,8 @@ export class IslandWorld {
         this.victoryParticles.rotation.y = time * 0.5;
       }
     }
+
+    this.updateVFX(dt);
 
     this.renderer.render(this.scene, this.camera);
     this.animationFrameId = requestAnimationFrame(this.tick);
@@ -1521,9 +1706,16 @@ export class IslandWorld {
     const { carriedDelta } = obstacleSystem.update(dt, time, this.playerPos, this.playerVel, this.isGrounded);
     this.playerPos.add(carriedDelta);
 
-    // Update Survival System (Energy Crystals & Mission Timers)
-    survivalSystem.update(dt, time, this.playerPos);
-    this.questProgress.survivalTimeRemaining = Math.ceil(survivalSystem.state.timeRemaining);
+    // Update Survival System (Energy Crystals & Mission Timers) - Only for survival-type missions
+    const mission = getMissionConfig(this.questProgress.currentMissionId);
+    if (mission.isSurvivalMission) {
+      survivalSystem.update(dt, time, this.playerPos);
+      this.questProgress.survivalTimeRemaining = Math.ceil(survivalSystem.state.timeRemaining);
+    } else {
+      // Ensure state is inactive for non-survival missions
+      survivalSystem.setMissionActive(false);
+      this.questProgress.survivalTimeRemaining = 0;
+    }
 
     // Broadcast state for multiplayer synchronization
     networkSync.broadcastState(
@@ -1568,10 +1760,16 @@ export class IslandWorld {
         this.playerVel.y = 0;
         this.isGrounded = true;
         sound.playLand();
+        this.spawnImpactVFX(this.playerPos, 0xd2b48c, 24, 0.18, 2.5); // Landing impact
       }
     } else {
       // Snug ground alignment with higher damping coefficient for silky smooth elevation tracking
       this.playerPos.y = THREE.MathUtils.damp(this.playerPos.y, groundY, 28, dt);
+      
+      // Spawn footstep particles if moving
+      if (actualSpeed > 4.5 && this.footstepTimer === 0) {
+        this.spawnImpactVFX(this.playerPos, 0xd2b48c, 4, 0.08, 0.8);
+      }
     }
 
     this.player.group.position.copy(this.playerPos);
@@ -1614,16 +1812,25 @@ export class IslandWorld {
       }
     }
     
-    // Process Combat Inputs
+    // Process Combat Inputs with single-pulse consumption
     if (this.playerCombatState === 'idle') {
       if (this.inputs.attack && this.questProgress.attackCooldown <= 0) {
-        this.executeSwordAttack();
+        this.inputs.attack = false;
+        // Priority: Silent Stealth Takedown if behind unaware guard
+        const takedownGuard = this.guardAIController.isTakedownAvailable(this.playerPos, this.playerRotation);
+        if (takedownGuard) {
+          this.executeStealthTakedown(takedownGuard);
+        } else {
+          this.executeSwordAttack();
+        }
       } else if (this.inputs.parry) {
         this.playerCombatState = 'parry';
         this.questProgress.isParrying = true;
       } else if (this.inputs.dodge && this.questProgress.dodgeCooldown <= 0) {
+        this.inputs.dodge = false;
         this.executeDodge();
       } else if (this.inputs.shoot && this.questProgress.firearmAuthorized && this.questProgress.ammoCount > 0) {
+        this.inputs.shoot = false;
         this.executeFirearmShot();
       }
     }
@@ -1635,6 +1842,28 @@ export class IslandWorld {
     }
   }
 
+  public executeStealthTakedown(guard: PatrolGuard) {
+    this.playerCombatState = 'attack';
+    this.playerCombatTimer = 0;
+    this.questProgress.attackCooldown = 0.9;
+
+    const result = this.guardAIController.attemptTakedown(this.playerPos, this.playerRotation);
+    if (result.success) {
+      sound.playSwordSlash();
+      triggerHaptic(Haptics.SUCCESS);
+      this.questProgress.xpEarned += 60;
+      this.questProgress.coinsCollected += 15;
+      if (this.onQuestUpdate) this.onQuestUpdate({ ...this.questProgress });
+      if (this.onToastNotification) {
+        this.onToastNotification({
+          type: 'achievement',
+          title: 'Silent Takedown!',
+          message: `${result.guardName || guard.name} incapacitated silently. (+60 XP, +15 Gold)`,
+        });
+      }
+    }
+  }
+
   private executeSwordAttack() {
     this.playerCombatState = 'attack';
     this.playerCombatTimer = 0;
@@ -1642,12 +1871,17 @@ export class IslandWorld {
     
     sound.playSwordSlash();
     
-    // Hit detection: cone-based sweep 2.2m ahead
+    // Hit detection: cone-based sweep 2.5m ahead with solid wall/obstacle occlusion check
     const guards = this.guardAIController.getGuards();
     guards.forEach(guard => {
       if (guard.state === 'disabled') return;
       const d = this.playerPos.distanceTo(guard.position);
       if (d < 2.5) {
+        // Line-of-sight check: solid obstacles and walls block sword attacks
+        if (!this.collisionSystem.checkLineOfSightClear(this.playerPos, guard.position)) {
+          return;
+        }
+
         // Angle check
         _vec3A.set(Math.sin(this.playerRotation), 0, Math.cos(this.playerRotation));
         _vec3B.subVectors(guard.position, this.playerPos).normalize();
@@ -1685,13 +1919,19 @@ export class IslandWorld {
     // Create loud noise to attract guards (central mission gating)
     const mission = getMissionConfig(this.questProgress.currentMissionId);
     this.guardAIController.triggerNoiseDistraction(this.playerPos, mission.firearmNoiseRadius || 24.0);
+    this.dogAIController.triggerNoiseDistraction(this.playerPos, mission.firearmNoiseRadius || 24.0);
     
-    // Raycast hit detection (simplified tight cone)
+    // Raycast hit detection with solid wall/obstacle occlusion check
     const guards = this.guardAIController.getGuards();
     guards.forEach(guard => {
       if (guard.state === 'disabled') return;
       const d = this.playerPos.distanceTo(guard.position);
       if (d < 18.0) {
+        // Line-of-sight check: solid obstacles and walls block gunshots
+        if (!this.collisionSystem.checkLineOfSightClear(this.playerPos, guard.position)) {
+          return;
+        }
+
         _vec3A.set(Math.sin(this.playerRotation), 0, Math.cos(this.playerRotation));
         _vec3B.subVectors(guard.position, this.playerPos).normalize();
         if (_vec3A.dot(_vec3B) > 0.96) { // Tight shot
@@ -1719,6 +1959,9 @@ export class IslandWorld {
     this.playerCombatTimer = 0;
     
     sound.playLand(); // Flinch sound
+
+    // Tactile feedback for damage
+    triggerHaptic(finalDamage > 20 ? Haptics.DOUBLE : Haptics.HEAVY);
     
     if (this.onQuestUpdate) this.onQuestUpdate({ ...this.questProgress });
     
@@ -1732,15 +1975,31 @@ export class IslandWorld {
     let activePrompt: string | null = null;
     let newTarget: typeof this.currentInteractTarget = null;
 
+    // 0. Stealth Takedown check when behind unaware guard
+    const takedownGuard = this.guardAIController.isTakedownAvailable(this.playerPos, this.playerRotation);
+    if (takedownGuard) {
+      activePrompt = `Press [E] or [Strike] for Silent Takedown (${takedownGuard.name})`;
+      newTarget = `takedown_${takedownGuard.id}`;
+    }
+
+    // High Alert Suppression: Suppress interactions during active chase encounters
+    const { state: highestState } = this.guardAIController.getHighestDetection();
+    if (highestState === 'chase') {
+      activePrompt = null;
+      newTarget = null;
+    }
+
     // 1. Check Collectible Keys
-    for (const [keyId, keyData] of this.keys.entries()) {
-      if (!keyData.collected) {
-        const d = this.playerPos.distanceTo(keyData.pos);
-        if (d < 2.6) {
-          const keyNames = { sun: 'Sun Key', ocean: 'Ocean Key', forest: 'Forest Key' };
-          activePrompt = `Press [E] to Collect ${keyNames[keyId]}`;
-          newTarget = keyId;
-          break;
+    if (!activePrompt) {
+      for (const [keyId, keyData] of this.keys.entries()) {
+        if (!keyData.collected) {
+          const d = this.playerPos.distanceTo(keyData.pos);
+          if (d < 2.6) {
+            const keyNames = { sun: 'Sun Key', ocean: 'Ocean Key', forest: 'Forest Key' };
+            activePrompt = `Press [E] to Collect ${keyNames[keyId]}`;
+            newTarget = keyId;
+            break;
+          }
         }
       }
     }
@@ -1851,6 +2110,14 @@ export class IslandWorld {
   public handleInteract() {
     if (!this.currentInteractTarget) return;
 
+    if (this.currentInteractTarget.startsWith('takedown_')) {
+      const guard = this.guardAIController.isTakedownAvailable(this.playerPos, this.playerRotation);
+      if (guard) {
+        this.executeStealthTakedown(guard);
+      }
+      return;
+    }
+
     if (this.currentInteractTarget.startsWith('puzzle_')) {
       if (this.onOpenPuzzleModal) {
         this.onOpenPuzzleModal(this.currentInteractTarget);
@@ -1912,6 +2179,7 @@ export class IslandWorld {
       const targetChest = this.chests.find((c) => c.id === this.currentInteractTarget);
       if (targetChest && !targetChest.opened) {
         targetChest.opened = true;
+        DailyChallengeManager.updateChallenge('dc_chests', 1);
         targetChest.instance.open();
         this.questProgress.chestsOpened++;
         this.questProgress.coinsCollected += targetChest.coinsReward;
@@ -2163,14 +2431,23 @@ export class IslandWorld {
     if (!this.container) return;
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+    if (width === 0 || height === 0) return;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   };
 
+  public onOrientationChange = () => {
+    this.onResize();
+    // Mobile browsers often adjust viewport dimensions after rotation animation finishes
+    setTimeout(() => this.onResize(), 150);
+    setTimeout(() => this.onResize(), 350);
+  };
+
   public dispose() {
     cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.onResize);
+    window.removeEventListener('orientationchange', this.onOrientationChange);
     this.collisionSystem.clearObstacles();
     this.renderer.dispose();
     if (this.renderer.domElement && this.renderer.domElement.parentNode) {

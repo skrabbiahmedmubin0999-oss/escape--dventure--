@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { AdventurerCharacter, createAdventurerModel, getIslandHeight } from './proceduralAssets';
-import { collisionSystem, CollisionLayer } from './collisionSystem';
+import { collisionSystem, CollisionLayer, CollisionSystem } from './collisionSystem';
 import { sound } from '../audio/soundSystem';
+import { triggerHaptic, Haptics } from './haptics';
 
 export type GuardAIState =
   | 'patrol'           // Following patrol waypoints
@@ -20,6 +21,8 @@ export interface PatrolGuard {
   velocity: THREE.Vector3;
   rotation: number;
   waypoints: THREE.Vector3[];
+  pauseDurations: number[]; // Seconds to pause at each waypoint
+  pauseTimer: number;       // Current pause time remaining
   currentWaypointIdx: number;
   state: GuardAIState;
   detectionLevel: number; // 0 to 100
@@ -50,6 +53,13 @@ export class GuardAIController {
   public onPlayerSpotted?: (guardName: string) => void;
   public onGuardStrike?: (guard: PatrolGuard) => void;
   
+  // Authoritative collision system shared with player and world
+  private collisionSystem: CollisionSystem = collisionSystem;
+
+  public setCollisionSystem(cs: CollisionSystem) {
+    this.collisionSystem = cs;
+  }
+  
   // Alert encounter debouncing: ensures simultaneous multi-guard alerts
   // and rapid chase/search flickers count as a single cohesive detection encounter.
   private isAlertEncounterActive: boolean = false;
@@ -73,6 +83,7 @@ export class GuardAIController {
           new THREE.Vector3(-18, 0, 8),
           new THREE.Vector3(-24, 0, 2),
         ],
+        pauseDurations: [2.0, 1.0, 2.0, 1.0],
       },
       {
         id: 'guard_village',
@@ -85,6 +96,7 @@ export class GuardAIController {
           new THREE.Vector3(-10, 0, 18),
           new THREE.Vector3(-14, 0, 10),
         ],
+        pauseDurations: [1.5, 1.5, 1.5, 1.5],
       },
       {
         id: 'guard_temple',
@@ -97,6 +109,7 @@ export class GuardAIController {
           new THREE.Vector3(14, 0, -22),
           new THREE.Vector3(20, 0, -24),
         ],
+        pauseDurations: [3.0, 0.5, 3.0, 0.5],
       },
     ];
 
@@ -121,6 +134,8 @@ export class GuardAIController {
         velocity: new THREE.Vector3(),
         rotation: 0,
         waypoints: cfg.waypoints,
+        pauseDurations: cfg.pauseDurations,
+        pauseTimer: 0,
         currentWaypointIdx: 0,
         state: 'patrol',
         detectionLevel: 0,
@@ -277,6 +292,7 @@ export class GuardAIController {
             this.isAlertEncounterActive = true;
             this.alertCooldownTimer = 4.0;
             sound.playAltarActivate(); // Alert sound cue
+            triggerHaptic(Haptics.ALERT);
             if (this.onPlayerSpotted) {
               this.onPlayerSpotted(guard.name);
             }
@@ -297,13 +313,21 @@ export class GuardAIController {
       let moveSpeed = 3.2; // Normal patrol speed
 
       if (guard.state === 'patrol' || guard.state === 'return-to-patrol') {
-        const wp = guard.waypoints[guard.currentWaypointIdx];
-        targetPos = wp;
-        moveSpeed = 2.8;
+        if (guard.pauseTimer > 0) {
+          guard.pauseTimer -= dt;
+          moveSpeed = 0;
+          targetPos = null; // Stationary while paused
+        } else {
+          const wp = guard.waypoints[guard.currentWaypointIdx];
+          targetPos = wp;
+          moveSpeed = 2.8;
 
-        if (guard.position.distanceTo(wp) < 1.5) {
-          guard.currentWaypointIdx = (guard.currentWaypointIdx + 1) % guard.waypoints.length;
-          guard.state = 'patrol';
+          if (guard.position.distanceTo(wp) < 1.5) {
+            // Start pausing
+            guard.pauseTimer = guard.pauseDurations[guard.currentWaypointIdx] || 1.0;
+            guard.currentWaypointIdx = (guard.currentWaypointIdx + 1) % guard.waypoints.length;
+            guard.state = 'patrol';
+          }
         }
       } else if (guard.state === 'suspicious' || guard.state === 'investigate') {
         targetPos = guard.lastKnownPlayerPos;
@@ -382,8 +406,8 @@ export class GuardAIController {
           _vec3A.normalize().multiplyScalar(moveSpeed);
           _guardVel.set(_vec3A.x, 0, _vec3A.z);
 
-          // Apply substepping collision resolution to guard position
-          collisionSystem.resolveMovementWithSubstepping(guard.position, _guardVel, dt, 0.55);
+          // Apply substepping collision resolution to guard position using authoritative collision system
+          this.collisionSystem.resolveMovementWithSubstepping(guard.position, _guardVel, dt, 0.55);
 
           guard.rotation = Math.atan2(_vec3A.x, _vec3A.z);
           guard.character.updateAnimation(time, moveSpeed / 4.5, false, moveSpeed > 4.5);
@@ -421,31 +445,49 @@ export class GuardAIController {
    * Raycast check to verify if vision between guard and player is unobstructed by solid walls or cottages
    */
   private checkLineOfSightClear(from: THREE.Vector3, to: THREE.Vector3): boolean {
-    return collisionSystem.checkLineOfSightClear(from, to);
+    return this.collisionSystem.checkLineOfSightClear(from, to);
   }
 
   /**
-   * Attempt stealth takedown behind guard
+   * Checks if player is currently in position to perform a stealth takedown on any guard
    */
-  public attemptTakedown(playerPos: THREE.Vector3, playerRotation: number): { success: boolean; guardName?: string } {
+  public isTakedownAvailable(playerPos: THREE.Vector3, playerRotation: number): PatrolGuard | null {
     for (const guard of this.guards) {
       if (guard.state === 'disabled' || guard.state === 'chase') continue;
 
       const d = guard.position.distanceTo(playerPos);
       if (d < 2.2) {
+        // Line-of-sight check: must not be separated by a wall or door
+        if (!this.collisionSystem.checkLineOfSightClear(playerPos, guard.position)) {
+          continue;
+        }
+
         // Angle check: player must be behind guard
         const guardFacing = guard.rotation;
         _vec3A.set(Math.sin(guardFacing), 0, Math.cos(guardFacing));
         _vec3B.subVectors(playerPos, guard.position).normalize();
 
         const dot = _vec3A.dot(_vec3B);
-        if (dot < -0.2) { // Behind guard
-          guard.state = 'disabled';
-          guard.disabledTimer = 18.0; // Stunned for 18 seconds
-          sound.playLand();
-          return { success: true, guardName: guard.name };
+        if (dot < -0.2) {
+          return guard;
         }
       }
+    }
+    return null;
+  }
+
+  /**
+   * Attempt stealth takedown behind guard
+   */
+  public attemptTakedown(playerPos: THREE.Vector3, playerRotation: number): { success: boolean; guardName?: string } {
+    const targetGuard = this.isTakedownAvailable(playerPos, playerRotation);
+    if (targetGuard) {
+      targetGuard.state = 'disabled';
+      targetGuard.disabledTimer = 25.0; // Stunned for 25 seconds
+      targetGuard.health = 0;
+      targetGuard.detectionLevel = 0;
+      sound.playLand();
+      return { success: true, guardName: targetGuard.name };
     }
     return { success: false };
   }
@@ -497,7 +539,7 @@ export class GuardAIController {
       _vec3A.subVectors(playerPos, companionPos).normalize().multiplyScalar(3.8);
       _companionVel.set(_vec3A.x, 0, _vec3A.z);
 
-      collisionSystem.resolveMovementWithSubstepping(companionPos, _companionVel, dt, 0.55);
+      this.collisionSystem.resolveMovementWithSubstepping(companionPos, _companionVel, dt, 0.55);
 
       companion.group.rotation.y = Math.atan2(_vec3A.x, _vec3A.z);
       companion.updateAnimation(time, 1, false, false);

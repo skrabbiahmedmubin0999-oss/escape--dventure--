@@ -25,66 +25,80 @@ export const FailureModal: React.FC<Props> = ({
   const formattedTime = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-300 pointer-events-auto select-none font-sans">
-      <div className="relative w-full max-w-md bg-slate-900 border-2 border-red-500/50 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-slate-100 p-5 sm:p-7 text-center max-h-[88dvh] overflow-y-auto custom-scrollbar">
-        {/* Top Failure Icon Badge */}
-        <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-red-500/20 border-2 border-red-500/60 text-red-400 flex items-center justify-center shadow-lg shadow-red-500/20 mb-4 animate-bounce">
-          <AlertTriangle className="w-9 h-9 sm:w-11 sm:h-11" />
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-500 pointer-events-auto select-none font-sans">
+      <div className="relative w-full max-w-md landscape:max-w-2xl bg-slate-900/90 backdrop-blur-2xl border border-red-500/30 rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col text-slate-100 max-h-[90dvh] ring-1 ring-red-500/20 animate-in zoom-in-95 duration-300">
+        
+        <div className="absolute inset-0 bg-gradient-to-b from-red-500/10 via-transparent to-transparent pointer-events-none" />
 
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-red-400 uppercase">
-          Mission Failed
-        </h2>
+        <div className="flex flex-col landscape:flex-row flex-1 overflow-y-auto custom-scrollbar p-6 landscape:p-7 gap-5 landscape:gap-6 items-center">
+          {/* Left Column: Icon, Title & Failure Reason */}
+          <div className="flex flex-col items-center landscape:items-start text-center landscape:text-left landscape:w-5/12 shrink-0 relative z-10">
+            <div className="w-16 h-16 rounded-[1.5rem] bg-red-500/10 border-2 border-red-500/30 text-red-500 flex items-center justify-center shadow-[0_0_30px_rgba(239,68,68,0.25)] mb-3 animate-pulse">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
 
-        <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed max-w-xs mx-auto">
-          {reason}
-        </p>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white uppercase">
+                Link Fragmented
+              </h2>
+            </div>
+            <div className="text-[10px] font-bold text-red-300 bg-red-500/20 px-2.5 py-0.5 rounded-full border border-red-500/30 mb-2">
+              মিশন ব্যর্থ • সংযোগ বিচ্ছিন্ন
+            </div>
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-red-500/80 mb-3">
+              Mission Critical Failure
+            </p>
 
-        {/* Mission Stats Breakdown */}
-        <div className="my-6 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 grid grid-cols-3 gap-2">
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-cyan-400" /> Crystals
-            </span>
-            <span className="text-base font-extrabold text-cyan-300 mt-1">
-              {crystalsCollected}/{totalCrystals}
-            </span>
+            <div className="bg-white/5 p-3 rounded-xl border border-white/5 text-[11px] text-slate-300 italic leading-relaxed">
+              "{reason}"
+            </div>
           </div>
 
-          <div className="flex flex-col items-center border-x border-slate-800">
-            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-              <Coins className="w-3 h-3 text-amber-400" /> Gold
-            </span>
-            <span className="text-base font-extrabold text-amber-300 mt-1">
-              {coinsCollected}
-            </span>
+          {/* Right Column: Mission Stats Breakdown & Actions */}
+          <div className="flex-1 flex flex-col justify-center space-y-4 w-full relative z-10">
+            {/* Mission Stats Breakdown */}
+            <div className="p-3.5 rounded-2xl bg-white/5 border border-white/5 grid grid-cols-3 gap-2 text-center">
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black tracking-wider text-slate-500 mb-0.5">Assets (কি)</span>
+                <span className="text-base font-black text-white">
+                  {crystalsCollected}/{totalCrystals}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center border-x border-white/5">
+                <span className="text-[8px] uppercase font-black tracking-wider text-slate-500 mb-0.5">Credits (কয়েন)</span>
+                <span className="text-base font-black text-amber-400">
+                  {coinsCollected}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center">
+                <span className="text-[8px] uppercase font-black tracking-wider text-slate-500 mb-0.5">Uptime (সময়)</span>
+                <span className="text-base font-black text-slate-300 font-mono">
+                  {formattedTime}
+                </span>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2.5 w-full shrink-0">
+              <button
+                onClick={onRetry}
+                className="w-full py-3.5 px-5 rounded-2xl bg-red-500 hover:bg-red-400 text-slate-950 font-black text-xs uppercase tracking-[0.15em] shadow-lg shadow-red-500/20 flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] cursor-pointer"
+              >
+                <RefreshCw className="w-4 h-4" />
+                <span>Re-Establish Link • আবার চেষ্টা করুন</span>
+              </button>
+
+              <button
+                onClick={onReturnToMenu}
+                className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200 font-black text-[10px] uppercase tracking-wider border border-white/10 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>Exit to Terminal • মূল মেনু</span>
+              </button>
+            </div>
           </div>
-
-          <div className="flex flex-col items-center">
-            <span className="text-[10px] uppercase font-bold text-slate-400 flex items-center gap-1">
-              <Clock className="w-3 h-3 text-slate-400" /> Time
-            </span>
-            <span className="text-base font-extrabold text-slate-200 mt-1 font-mono">
-              {formattedTime}
-            </span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full shrink-0">
-          <button
-            onClick={onRetry}
-            className="w-full min-h-[48px] py-3 px-5 rounded-2xl bg-gradient-to-r from-red-600 via-amber-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-slate-950 font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95"
-          >
-            <RefreshCw className="w-4 h-4" /> Try Again
-          </button>
-
-          <button
-            onClick={onReturnToMenu}
-            className="w-full sm:w-auto min-h-[44px] py-2.5 px-5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs uppercase tracking-wider border border-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer active:scale-95 shrink-0"
-          >
-            <Home className="w-4 h-4" /> Menu
-          </button>
         </div>
       </div>
     </div>

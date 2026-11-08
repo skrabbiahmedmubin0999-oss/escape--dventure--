@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, User, Award, Key, Clock, CheckCircle, Coins, Package, Zap } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { sound } from '../audio/soundSystem';
 import { PlayerCustomization, PlayerStats } from '../game/types';
 
@@ -49,17 +50,29 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md font-sans">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[88dvh] animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 bg-slate-950/60 shrink-0">
-          <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shrink-0">
-              <User className="w-4 h-4 sm:w-5 sm:h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm pointer-events-auto font-sans">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-slate-900/90 backdrop-blur-2xl border border-white/10 rounded-[2rem] w-full max-w-xl landscape:max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90dvh] mx-auto"
+      >
+        {/* Header - Expedition Terminal */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+              <User className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-extrabold text-white leading-tight">Player Profile</h2>
-              <p className="text-[10px] sm:text-xs text-slate-400">Explorer identity & adventure statistics</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-white tracking-tight uppercase">Explorer Identity</h2>
+                <span className="text-[10px] font-bold text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">প্রোফাইল সেটিংস</span>
+              </div>
+              <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                <span>Neural Link Status</span>
+                <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-400 uppercase tracking-widest font-bold">Synchronized</span>
+              </div>
             </div>
           </div>
 
@@ -68,55 +81,68 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               sound.playClick();
               onClose();
             }}
-            className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer group"
             aria-label="Close"
           >
-            <X className="w-4 h-4 sm:w-5 sm:h-5" />
+            <X className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 overflow-y-auto custom-scrollbar flex-1">
+        <div className="p-6 space-y-8 overflow-y-auto custom-scrollbar flex-1">
           {/* Identity Section */}
-          <div className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-1">
-                Explorer Name
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400/80 ml-1">
+                Designation
               </label>
               <input
                 type="text"
                 value={customization.name}
                 onChange={(e) => onUpdateCustomization({ name: e.target.value })}
                 maxLength={20}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500"
+                placeholder="Enter Name..."
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-amber-400/50 focus:ring-1 focus:ring-amber-400/20 transition-all placeholder:text-slate-600"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-1">
-                Title Rank
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400/80 ml-1">
+                Expedition Rank
               </label>
-              <select
-                value={customization.title}
-                onChange={(e) => onUpdateCustomization({ title: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white font-bold text-sm focus:outline-none focus:border-amber-500 cursor-pointer"
-              >
-                {TITLES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={customization.title}
+                  onChange={(e) => onUpdateCustomization({ title: e.target.value })}
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-amber-400/50 appearance-none cursor-pointer"
+                >
+                  {TITLES.map((t) => (
+                    <option key={t} value={t} className="bg-slate-900 text-white">
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                  <Award className="w-4 h-4 text-amber-400/60" />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Outfit Customization */}
-          <div className="space-y-4 pt-2 border-t border-slate-800">
-            <div>
-              <div className="text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-2">
-                Explorer Tunic Color
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Visual Configuration</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-slate-300">Tunic Chromatics</span>
+                <span className="text-[10px] font-mono text-amber-400/60">S-01 // ARMOR_COL</span>
               </div>
-              <div className="grid grid-cols-3 xs:grid-cols-6 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 {TUNIC_COLORS.map((c) => (
                   <button
                     key={c.hex}
@@ -124,17 +150,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       sound.playClick();
                       onUpdateCustomization({ tunicColor: c.hex });
                     }}
-                    className={`min-h-[52px] p-2 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`aspect-square rounded-2xl border transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer ${
                       customization.tunicColor === c.hex
-                        ? 'bg-slate-800 border-amber-400 shadow'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        ? 'bg-amber-400/10 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.1)]'
+                        : 'bg-black/20 border-white/5 hover:border-white/20'
                     }`}
                   >
                     <div
-                      className="w-5 h-5 rounded-lg border border-white/20 shadow-sm"
+                      className="w-6 h-6 rounded-full border border-white/20 shadow-inner transition-transform group-hover:scale-110"
                       style={{ backgroundColor: c.hex }}
                     />
-                    <span className="text-[9px] text-slate-300 font-medium truncate w-full text-center">
+                    <span className="text-[8px] font-black uppercase tracking-tighter text-slate-400 group-hover:text-slate-200">
                       {c.name.split(' ')[0]}
                     </span>
                   </button>
@@ -142,11 +168,12 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <div className="text-xs font-extrabold uppercase tracking-wider text-amber-400 mb-2">
-                Hat Color
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-slate-300">Headgear Palette</span>
+                <span className="text-[10px] font-mono text-amber-400/60">S-02 // HEAD_GEAR</span>
               </div>
-              <div className="grid grid-cols-3 xs:grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
                 {HAT_COLORS.map((c) => (
                   <button
                     key={c.hex}
@@ -154,17 +181,17 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                       sound.playClick();
                       onUpdateCustomization({ hatColor: c.hex });
                     }}
-                    className={`min-h-[52px] p-2 rounded-xl border flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    className={`aspect-square rounded-2xl border transition-all flex flex-col items-center justify-center gap-2 group cursor-pointer ${
                       customization.hatColor === c.hex
-                        ? 'bg-slate-800 border-amber-400 shadow'
-                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                        ? 'bg-amber-400/10 border-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.1)]'
+                        : 'bg-black/20 border-white/5 hover:border-white/20'
                     }`}
                   >
                     <div
-                      className="w-5 h-5 rounded-lg border border-white/20 shadow-sm"
+                      className="w-6 h-6 rounded-full border border-white/20 shadow-inner transition-transform group-hover:scale-110"
                       style={{ backgroundColor: c.hex }}
                     />
-                    <span className="text-[9px] text-slate-300 font-medium truncate w-full text-center">
+                    <span className="text-[8px] font-black uppercase tracking-tighter text-slate-400 group-hover:text-slate-200">
                       {c.name.split(' ')[0]}
                     </span>
                   </button>
@@ -174,82 +201,69 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
           </div>
 
           {/* Player Statistics */}
-          <div className="space-y-3 pt-2 border-t border-slate-800">
-            <div className="flex items-center justify-between">
-              <div className="text-xs font-extrabold uppercase tracking-wider text-amber-400 flex items-center gap-2">
-                <Award className="w-4 h-4" /> Lifetime Statistics
+          <div className="space-y-6">
+            <div className="flex items-center gap-4">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Expedition Metrics</span>
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-amber-400/10 border border-amber-400/20">
+                  <Award className="w-4 h-4 text-amber-400" />
+                </div>
+                <span className="text-xs font-black uppercase tracking-widest text-white">Lifetime Log</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                <span>Level {stats.level ?? 1} ({stats.xp ?? 0} XP)</span>
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 shadow-[0_0_15px_rgba(251,191,36,0.05)]">
+                <Zap className="w-3 h-3 text-amber-400 fill-amber-400" />
+                <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                  Level {stats.level ?? 1} · {stats.xp ?? 0} XP
+                </span>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 xs:grid-cols-3 gap-2 sm:gap-2.5">
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <Clock className="w-4 h-4 text-sky-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Best Escape</div>
-                <div className="text-sm font-black font-mono text-white mt-0.5">
-                  {formatTime(stats.bestTime)}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { icon: Clock, label: 'Best Escape', value: formatTime(stats.bestTime), color: 'text-sky-400' },
+                { icon: Key, label: 'Keys Found', value: stats.totalKeysCollected ?? 0, color: 'text-amber-400' },
+                { icon: Coins, label: 'Gold Assets', value: stats.totalCoins ?? 0, color: 'text-yellow-400' },
+                { icon: Package, label: 'Vaults Opened', value: stats.totalChests ?? 0, color: 'text-sky-400' },
+                { icon: Award, label: 'Riddles Solved', value: stats.puzzlesSolved ?? 0, color: 'text-emerald-400' },
+                { icon: CheckCircle, label: 'Extractions', value: stats.gamesCompleted ?? 0, color: 'text-purple-400' },
+              ].map((stat, i) => (
+                <div 
+                  key={i}
+                  className="bg-black/30 border border-white/5 rounded-2xl p-4 flex flex-col items-center text-center group hover:border-white/10 transition-all hover:bg-black/40"
+                >
+                  <stat.icon className={`w-5 h-5 ${stat.color} mb-3 opacity-60 group-hover:opacity-100 transition-opacity`} />
+                  <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">{stat.label}</div>
+                  <div className="text-sm font-black font-mono text-white tracking-tight">
+                    {stat.value}
+                  </div>
                 </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <Key className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Keys Found</div>
-                <div className="text-sm font-black font-mono text-white mt-0.5">
-                  {stats.totalKeysCollected ?? 0}
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <Coins className="w-4 h-4 text-amber-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Gold Coins</div>
-                <div className="text-sm font-black font-mono text-amber-300 mt-0.5">
-                  {stats.totalCoins ?? 0}
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <Package className="w-4 h-4 text-sky-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Chests Opened</div>
-                <div className="text-sm font-black font-mono text-sky-300 mt-0.5">
-                  {stats.totalChests ?? 0}
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <Award className="w-4 h-4 text-emerald-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Puzzles Solved</div>
-                <div className="text-sm font-black font-mono text-white mt-0.5">
-                  {stats.puzzlesSolved ?? 0}
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                <CheckCircle className="w-4 h-4 text-purple-400 mx-auto mb-1" />
-                <div className="text-[9px] text-slate-400 font-semibold uppercase">Escapes Won</div>
-                <div className="text-sm font-black font-mono text-white mt-0.5">
-                  {stats.gamesCompleted ?? 0}
-                </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 sm:px-6 sm:py-4 bg-slate-950/80 border-t border-slate-800 flex justify-end shrink-0">
+        <div className="px-6 py-5 bg-white/5 border-t border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+          <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest hidden sm:block">
+            ID: LINK-OS // VER: 4.8.0
+          </div>
           <button
             onClick={() => {
               sound.playClick();
               onClose();
             }}
-            className="w-full xs:w-auto min-h-[46px] px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center active:scale-95"
+            className="w-full sm:w-auto min-h-[48px] px-8 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(251,191,36,0.2)] active:scale-95 cursor-pointer"
           >
-            Save Profile
+            Update Profile
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
+

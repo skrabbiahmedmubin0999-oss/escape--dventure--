@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { IslandWorld } from './game/IslandWorld';
-import { GameMode, GameSettings, PlayerCustomization, PlayerStats, QuestProgress, EnvironmentState, TimeOfDay, WeatherType, NotificationToast, ControlLayoutConfig, DEFAULT_CONTROL_LAYOUT } from './game/types';
+import { GameMode, GameSettings, PlayerCustomization, PlayerStats, QuestProgress, EnvironmentState, TimeOfDay, WeatherType, NotificationToast, ControlLayoutConfig, DEFAULT_CONTROL_LAYOUT, KeyBindings, DEFAULT_KEY_BINDINGS, AdvancedGraphicsSettings, DEFAULT_ADVANCED_GRAPHICS } from './game/types';
 import { sound } from './audio/soundSystem';
 import { MainMenu } from './components/MainMenu';
 import { GameHUD } from './components/GameHUD';
@@ -11,6 +11,8 @@ import { HowToPlayModal } from './components/HowToPlayModal';
 import { VictoryModal } from './components/VictoryModal';
 import { MobileControls } from './components/MobileControls';
 import { ControlCustomizerModal } from './components/ControlCustomizerModal';
+import { KeybindingsModal } from './components/KeybindingsModal';
+import { FeatureManagerModal } from './components/FeatureManagerModal';
 import { NotificationToastContainer } from './components/NotificationToast';
 import { PuzzleModal } from './components/PuzzleModal';
 import { InventoryModal } from './components/InventoryModal';
@@ -26,6 +28,9 @@ import { MISSION_CONFIGS, getMissionConfig } from './game/levelManifest';
 import { runCollisionTestSuite } from './game/collisionTests';
 import { runGameplayQATestSuite } from './game/gameplayQATests';
 import { offlineStorage } from './game/storage/StorageAdapter';
+import { configureHaptics } from './game/haptics';
+import { OrientationPromptOverlay } from './components/OrientationPromptOverlay';
+import { useDeviceOrientation, requestLandscapeAndFullscreen } from './utils/orientation';
 
 
 const DEFAULT_SETTINGS: GameSettings = {
@@ -37,6 +42,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   joystickSensitivity: 1.0,
   invertY: false,
   showFps: false,
+  hapticsEnabled: true,
+  hapticsIntensity: 'medium',
 };
 
 const DEFAULT_CUSTOMIZATION: PlayerCustomization = {
@@ -60,6 +67,24 @@ const DEFAULT_STATS: PlayerStats = {
 export default function App() {
   const canvasMountRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<IslandWorld | null>(null);
+  const { isPortrait, isMobile } = useDeviceOrientation();
+
+  // Strictly enforce landscape mode on touch / mobile devices on gesture
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleFirstTouch = () => {
+      requestLandscapeAndFullscreen().catch(() => {});
+    };
+
+    window.addEventListener('touchstart', handleFirstTouch, { once: true, passive: true });
+    window.addEventListener('pointerdown', handleFirstTouch, { once: true, passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleFirstTouch);
+      window.removeEventListener('pointerdown', handleFirstTouch);
+    };
+  }, [isMobile]);
 
   // Game UI States
   const [mode, setMode] = useState<GameMode>('menu');
@@ -153,9 +178,13 @@ export default function App() {
   const [showMissionSelect, setShowMissionSelect] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showControlCustomizer, setShowControlCustomizer] = useState(false);
+  const [showKeybindings, setShowKeybindings] = useState(false);
+  const [showFeatureManager, setShowFeatureManager] = useState(false);
   const [showMobileHelp, setShowMobileHelp] = useState(false);
   const [showPauseMenu, setShowPauseMenu] = useState(false);
   const [isLoadingScreen, setIsLoadingScreen] = useState(false);
+  const [keyBindings, setKeyBindings] = useState<KeyBindings>(DEFAULT_KEY_BINDINGS);
+  const [advancedGraphics, setAdvancedGraphics] = useState<AdvancedGraphicsSettings>(DEFAULT_ADVANCED_GRAPHICS);
 
   // Escape key toggles Pause Menu during active gameplay
   useEffect(() => {
@@ -293,6 +322,7 @@ export default function App() {
     }
     world.setPlayerCustomization(customization.tunicColor, customization.hatColor);
     sound.setVolumes(settings.sfxVolume, settings.musicVolume, !settings.soundEnabled);
+    configureHaptics(settings.hapticsEnabled, settings.hapticsIntensity);
     sound.startAmbient();
 
     // Run automated physics & collision test suite
@@ -416,6 +446,7 @@ export default function App() {
       }
     }
     sound.setVolumes(settings.sfxVolume, settings.musicVolume, !settings.soundEnabled);
+    configureHaptics(settings.hapticsEnabled, settings.hapticsIntensity);
     offlineStorage.saveSettings(settings).catch(() => {});
   }, [settings]);
 
@@ -436,46 +467,55 @@ export default function App() {
   useEffect(() => {
     offlineStorage.init().then(async () => {
       try {
-        const [savedSettings, savedProfile, savedStats, savedLayout] = await Promise.all([
+        const [savedSettings, savedProfile, savedStats, savedLayout, savedKeyBindings, savedGraphics] = await Promise.all([
           offlineStorage.loadSettings(),
           offlineStorage.loadProfile(),
           offlineStorage.loadStats(),
           offlineStorage.loadControlLayout(),
+          offlineStorage.loadKeyBindings(),
+          offlineStorage.loadAdvancedGraphics(),
         ]);
         if (savedSettings) setSettings((prev) => ({ ...prev, ...savedSettings }));
         if (savedProfile) setCustomization((prev) => ({ ...prev, ...savedProfile }));
         if (savedStats) setStats((prev) => ({ ...prev, ...savedStats }));
         if (savedLayout) setControlLayout(savedLayout);
+        if (savedKeyBindings) setKeyBindings(savedKeyBindings);
+        if (savedGraphics) {
+          setAdvancedGraphics(savedGraphics);
+          worldRef.current?.setAdvancedGraphics(savedGraphics);
+        }
       } catch (err) {
         console.warn('[Storage] Error hydrating from offlineStorage on startup:', err);
       }
     });
   }, []);
 
-  // 2. Keyboard Input Listeners
+  // 2. Keyboard Input Listeners (Remappable Keybindings System)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'SELECT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
       if (!worldRef.current) return;
 
       const code = e.code;
-      if (code === 'KeyW' || code === 'ArrowUp') worldRef.current.inputs.forward = true;
-      if (code === 'KeyS' || code === 'ArrowDown') worldRef.current.inputs.backward = true;
-      if (code === 'KeyA' || code === 'ArrowLeft') worldRef.current.inputs.left = true;
-      if (code === 'KeyD' || code === 'ArrowRight') worldRef.current.inputs.right = true;
-      if (code === 'ShiftLeft' || code === 'ShiftRight') worldRef.current.inputs.sprint = true;
-      if (code === 'KeyC' || code === 'ControlLeft' || code === 'ControlRight') worldRef.current.inputs.crouch = true;
-      if (code === 'Space') {
+      const k = keyBindings;
+
+      if (code === k.moveForward || code === 'ArrowUp') worldRef.current.inputs.forward = true;
+      if (code === k.moveBackward || code === 'ArrowDown') worldRef.current.inputs.backward = true;
+      if (code === k.moveLeft || code === 'ArrowLeft') worldRef.current.inputs.left = true;
+      if (code === k.moveRight || code === 'ArrowRight') worldRef.current.inputs.right = true;
+      if (code === k.sprint || code === 'ShiftRight') worldRef.current.inputs.sprint = true;
+      if (code === k.crouch || code === 'ControlLeft') worldRef.current.inputs.crouch = true;
+      if (code === k.jump) {
         e.preventDefault();
         worldRef.current.inputs.jump = true;
       }
-      if (code === 'KeyE') {
+      if (code === k.interact) {
         worldRef.current.inputs.interact = true;
       }
-      if (code === 'KeyI') {
+      if (code === k.openInventory) {
         setShowInventory((prev) => !prev);
       }
-      if (code === 'KeyT') {
+      if (code === k.openAchievements) {
         setShowAchievements((prev) => !prev);
       }
       if (code === 'KeyM') {
@@ -484,38 +524,36 @@ export default function App() {
       if (code === 'KeyP') {
         worldRef.current.togglePhysicsWireframes();
       }
-      if (code === 'KeyQ' || code === 'KeyG') {
+      if (code === k.throwStone) {
         if (e.repeat) return; // Ignore key-repeat
         worldRef.current.throwStone();
       }
-      if (code === 'KeyF') {
-        const quest = worldRef.current.questProgress;
-        if (quest.firearmAuthorized && quest.ammoCount > 0) {
-          worldRef.current.inputs.shoot = true;
-        } else {
-          worldRef.current.inputs.attack = true;
-        }
+      if (code === k.attack) {
+        worldRef.current.inputs.attack = true;
       }
-      if (code === 'KeyR') worldRef.current.inputs.parry = true;
-      if (code === 'KeyX') worldRef.current.inputs.dodge = true;
+      if (code === k.shoot) {
+        worldRef.current.inputs.shoot = true;
+      }
+      if (code === k.parry) worldRef.current.inputs.parry = true;
+      if (code === k.dodge) worldRef.current.inputs.dodge = true;
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       if (!worldRef.current) return;
       const code = e.code;
-      if (code === 'KeyW' || code === 'ArrowUp') worldRef.current.inputs.forward = false;
-      if (code === 'KeyS' || code === 'ArrowDown') worldRef.current.inputs.backward = false;
-      if (code === 'KeyA' || code === 'ArrowLeft') worldRef.current.inputs.left = false;
-      if (code === 'KeyD' || code === 'ArrowRight') worldRef.current.inputs.right = false;
-      if (code === 'ShiftLeft' || code === 'ShiftRight') worldRef.current.inputs.sprint = false;
-      if (code === 'KeyC' || code === 'ControlLeft' || code === 'ControlRight') worldRef.current.inputs.crouch = false;
-      if (code === 'Space') worldRef.current.inputs.jump = false;
-      if (code === 'KeyF') {
-        worldRef.current.inputs.attack = false;
-        worldRef.current.inputs.shoot = false;
-      }
-      if (code === 'KeyR') worldRef.current.inputs.parry = false;
-      if (code === 'KeyX') worldRef.current.inputs.dodge = false;
+      const k = keyBindings;
+
+      if (code === k.moveForward || code === 'ArrowUp') worldRef.current.inputs.forward = false;
+      if (code === k.moveBackward || code === 'ArrowDown') worldRef.current.inputs.backward = false;
+      if (code === k.moveLeft || code === 'ArrowLeft') worldRef.current.inputs.left = false;
+      if (code === k.moveRight || code === 'ArrowRight') worldRef.current.inputs.right = false;
+      if (code === k.sprint || code === 'ShiftRight') worldRef.current.inputs.sprint = false;
+      if (code === k.crouch || code === 'ControlLeft') worldRef.current.inputs.crouch = false;
+      if (code === k.jump) worldRef.current.inputs.jump = false;
+      if (code === k.attack) worldRef.current.inputs.attack = false;
+      if (code === k.shoot) worldRef.current.inputs.shoot = false;
+      if (code === k.parry) worldRef.current.inputs.parry = false;
+      if (code === k.dodge) worldRef.current.inputs.dodge = false;
     };
 
     const handleBlur = () => {
@@ -541,7 +579,7 @@ export default function App() {
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
     };
-  }, []);
+  }, [keyBindings]);
 
   // 3. Pointer Drag for Camera Orbiting
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -572,6 +610,9 @@ export default function App() {
 
   // Actions
   const handleStartGame = async (withCompanion = false, loadSave = true, newSeed?: number, missionId?: string) => {
+    // Attempt landscape orientation lock and fullscreen on mobile
+    requestLandscapeAndFullscreen().catch(() => {});
+
     isTutorialDismissedRef.current = false;
     setTutorialNotice(null);
     if (worldRef.current) {
@@ -618,7 +659,7 @@ export default function App() {
 
   return (
     <div
-      className="relative w-full h-[100dvh] overflow-hidden bg-slate-950 select-none touch-none overscroll-none"
+      className="app-root-container relative w-full h-[100dvh] overflow-hidden bg-slate-950 select-none touch-none overscroll-none flex flex-col items-center justify-center p-safe"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -641,6 +682,7 @@ export default function App() {
           onOpenProfile={() => setShowProfile(true)}
           onOpenMissionSelect={() => setShowMissionSelect(true)}
           onOpenShare={() => setShowShare(true)}
+          onOpenAIMode={() => handleStartGame(true)}
           playerName={customization.name}
           playerTitle={customization.title}
           isMuted={!settings.soundEnabled}
@@ -662,6 +704,7 @@ export default function App() {
             }}
             onOpenSettings={() => setShowSettings(true)}
             onOpenPause={() => setShowPauseMenu(true)}
+            onOpenShare={() => setShowShare(true)}
             onReturnToMenu={handleReturnToMenu}
             isMuted={!settings.soundEnabled}
             onToggleMute={toggleMute}
@@ -698,6 +741,7 @@ export default function App() {
             maxPlayerHealth={quest.maxPlayerHealth ?? 100}
             ammoCount={quest.ammoCount ?? 0}
             maxAmmo={quest.maxAmmo ?? 0}
+            layout={controlLayout}
             getPerformanceStats={() => worldRef.current?.getPerformanceStats()}
           />
 
@@ -866,6 +910,10 @@ export default function App() {
             setShowPauseMenu(false);
             setShowHowToPlay(true);
           }}
+          onOpenShare={() => {
+            setShowPauseMenu(false);
+            setShowShare(true);
+          }}
           onSaveProgress={saveGameProgress}
           isMuted={!settings.soundEnabled}
           onToggleMute={toggleMute}
@@ -879,10 +927,26 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           settings={settings}
           onUpdateSettings={(newVals) => setSettings((prev) => ({ ...prev, ...newVals }))}
+          advancedGraphics={advancedGraphics}
+          onUpdateAdvancedGraphics={(newAdv) => {
+            setAdvancedGraphics((prev) => {
+              const updated = { ...prev, ...newAdv };
+              worldRef.current?.setAdvancedGraphics(updated);
+              return updated;
+            });
+          }}
           onSaveProgress={mode === 'playing' ? saveGameProgress : undefined}
           onOpenControlCustomizer={() => {
             setShowSettings(false);
             setShowControlCustomizer(true);
+          }}
+          onOpenKeybindings={() => {
+            setShowSettings(false);
+            setShowKeybindings(true);
+          }}
+          onOpenFeatureManager={() => {
+            setShowSettings(false);
+            setShowFeatureManager(true);
           }}
         />
       )}
@@ -895,6 +959,27 @@ export default function App() {
           layout={controlLayout}
           onSaveLayout={handleSaveControlLayout}
           onResetLayout={handleResetControlLayout}
+        />
+      )}
+
+      {/* Keybindings Modal */}
+      {showKeybindings && (
+        <KeybindingsModal
+          isOpen={showKeybindings}
+          onClose={() => setShowKeybindings(false)}
+          bindings={keyBindings}
+          onSaveBindings={(newBindings) => {
+            setKeyBindings(newBindings);
+            offlineStorage.saveKeyBindings(newBindings).catch(() => {});
+          }}
+        />
+      )}
+
+      {/* Feature Manager Modal */}
+      {showFeatureManager && (
+        <FeatureManagerModal
+          isOpen={showFeatureManager}
+          onClose={() => setShowFeatureManager(false)}
         />
       )}
 
@@ -942,6 +1027,9 @@ export default function App() {
           }}
         />
       )}
+
+      {/* Mobile Landscape Recommendation Overlay */}
+      <OrientationPromptOverlay isPortrait={isPortrait} isMobile={isMobile} />
     </div>
   );
 }

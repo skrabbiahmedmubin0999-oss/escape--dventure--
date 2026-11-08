@@ -20,10 +20,55 @@
     user-select: none;
     -webkit-touch-callout: none;
     -webkit-tap-highlight-color: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  /* Global root container viewport flexbox centering & safe-area margins */
+  .app-root-container {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    padding-top: var(--sat);
+    padding-right: var(--sar);
+    padding-bottom: var(--sab);
+    padding-left: var(--sal);
+    box-sizing: border-box;
+  }
+
+  /* Global modal backdrop flex centering enforcement */
+  .ui-modal-centered-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+    padding: max(0.75rem, var(--sat)) max(0.75rem, var(--sar)) max(0.75rem, var(--sab)) max(0.75rem, var(--sal));
+    box-sizing: border-box;
   }
 
   button, a, input, select {
     touch-action: manipulation;
+  }
+
+  /* Strict Landscape Enforcement: Never allow portrait overflow or distortion on mobile */
+  @media screen and (orientation: portrait) and (max-width: 900px) {
+    body {
+      position: fixed;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
   }
 }
 
@@ -62,4 +107,17 @@
   padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
   padding-left: max(8px, env(safe-area-inset-left, 8px));
   padding-right: max(8px, env(safe-area-inset-right, 8px));
+}
+
+/* Landscape-specific typography and layout optimization for mobile devices */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  /* Keep text balanced, legible, and unclipped on short landscape mobile displays */
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  
+  /* Optimize modal spacing for short landscape height */
+  .modal-landscape-content {
+    max-height: 88dvh;
+  }
 }

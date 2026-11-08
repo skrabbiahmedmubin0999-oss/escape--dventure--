@@ -28,15 +28,15 @@ export class SurvivalSystem {
   public onMissionCompleted?: (rewardCoins: number, rewardXp: number) => void;
   public onMissionFailed?: () => void;
 
-  public startMission() {
+  public setMissionActive(active: boolean, timeLimit: number = 240) {
     this.state = {
-      active: true,
+      active,
       title: 'Crystal Explorer Mission',
       description: 'Gather 5 Ancient Energy Crystals across Mystery Island before dusk!',
       targetCrystals: 5,
       crystalsCollected: 0,
-      timeLimit: 240,
-      timeRemaining: 240,
+      timeLimit,
+      timeRemaining: timeLimit,
       completed: false,
       failed: false,
     };
@@ -44,6 +44,10 @@ export class SurvivalSystem {
       c.collected = false;
       c.group.visible = true;
     });
+  }
+
+  public startMission(timeLimit: number = 240) {
+    this.setMissionActive(true, timeLimit);
   }
 
   public registerCrystal(id: string, name: string, group: THREE.Group, pos: THREE.Vector3) {
@@ -104,8 +108,8 @@ export class SurvivalSystem {
     }
   }
 
-  public resetMission() {
-    this.startMission();
+  public resetMission(active: boolean = false, timeLimit: number = 240) {
+    this.setMissionActive(active, timeLimit);
   }
 }
 

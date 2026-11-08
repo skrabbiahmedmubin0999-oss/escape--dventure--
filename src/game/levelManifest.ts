@@ -6,6 +6,8 @@ export interface MissionConfig {
   startingAmmo: number;
   maxAmmo: number;
   firearmNoiseRadius: number;
+  isSurvivalMission?: boolean; // Timer & crystal gathering only active for designated survival missions
+  survivalTimeLimit?: number;
 }
 
 export const MISSION_CONFIGS: Record<string, MissionConfig> = {
@@ -17,6 +19,7 @@ export const MISSION_CONFIGS: Record<string, MissionConfig> = {
     startingAmmo: 0,
     maxAmmo: 0,
     firearmNoiseRadius: 0,
+    isSurvivalMission: false,
   },
   mission_sunken_garrison: {
     id: 'mission_sunken_garrison',
@@ -26,6 +29,7 @@ export const MISSION_CONFIGS: Record<string, MissionConfig> = {
     startingAmmo: 4,
     maxAmmo: 4,
     firearmNoiseRadius: 24.0,
+    isSurvivalMission: false,
   },
   mission_night_harvest: {
     id: 'mission_night_harvest',
@@ -35,6 +39,8 @@ export const MISSION_CONFIGS: Record<string, MissionConfig> = {
     startingAmmo: 0,
     maxAmmo: 0,
     firearmNoiseRadius: 0,
+    isSurvivalMission: true,
+    survivalTimeLimit: 240,
   },
 };
 

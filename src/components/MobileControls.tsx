@@ -23,14 +23,7 @@ interface MobileControlsProps {
   joystickSensitivity?: number;
 }
 
-// Low-latency haptic vibration helper using browser Vibration API
-const triggerHaptic = (ms = 12) => {
-  if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-    try {
-      navigator.vibrate(ms);
-    } catch {}
-  }
-};
+import { triggerHaptic, Haptics } from '../game/haptics';
 
 export const MobileControls: React.FC<MobileControlsProps> = ({
   onJoystickMove,
@@ -68,6 +61,10 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       onSprint(false);
       if (onCrouch) onCrouch(false);
       onJump(false);
+      onAttack(false);
+      onParry(false);
+      onDodge(false);
+      onShoot(false);
     };
 
     window.addEventListener('blur', handleResetAllInputs);
@@ -79,7 +76,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       window.removeEventListener('pointercancel', handleResetAllInputs);
       document.removeEventListener('visibilitychange', handleResetAllInputs);
     };
-  }, [onJoystickMove, onSprint, onCrouch, onJump]);
+  }, [onJoystickMove, onSprint, onCrouch, onJump, onAttack, onParry, onDodge, onShoot]);
 
   // Handle Joystick with Pointer Capture & Zero Latency
   const handleJoystickDown = (e: React.PointerEvent) => {
@@ -182,10 +179,21 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
     }
   };
 
+  const handleAttackEnd = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    onAttack(false);
+    onShoot(false);
+  };
+
   const handleDodgePress = (e: React.SyntheticEvent) => {
     e.preventDefault();
     triggerHaptic(12);
     onDodge(true);
+  };
+
+  const handleDodgeEnd = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    onDodge(false);
   };
 
   const handleParryStart = (e: React.SyntheticEvent) => {
@@ -228,53 +236,55 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       {/* ======================================================== */}
       {/* 1. VIRTUAL JOYSTICK (Bottom-Left)                         */}
       {/* ======================================================== */}
-      <div
-        className="absolute pointer-events-auto touch-none transition-transform"
-        style={{
-          left: 'max(12px, env(safe-area-inset-left, 12px))',
-          bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
-          transform: `translate(${joy.x}px, ${joy.y}px) scale(${joy.scale})`,
-          opacity: joy.opacity,
-          transformOrigin: 'bottom left',
-        }}
-      >
+      {joy.enabled !== false && (
         <div
-          ref={stickBaseRef}
-          onPointerDown={handleJoystickDown}
-          onPointerMove={handleJoystickMove}
-          onPointerUp={handleJoystickUp}
-          onPointerCancel={handleJoystickUp}
-          className="w-24 h-24 xs:w-28 xs:h-28 sm:w-32 sm:h-32 rounded-full bg-slate-950/80 border-2 border-amber-400/40 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-sm"
-          style={{ touchAction: 'none' }}
+          className="absolute pointer-events-auto touch-none transition-transform"
+          style={{
+            left: 'max(12px, env(safe-area-inset-left, 12px))',
+            bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
+            transform: `translate(${joy.x}px, ${joy.y}px) scale(${joy.scale})`,
+            opacity: joy.opacity,
+            transformOrigin: 'bottom left',
+          }}
         >
-          {/* Directional cross guide */}
-          <div className="absolute w-16 h-16 xs:w-20 xs:h-20 rounded-full border border-white/10 pointer-events-none" />
-          <div className="absolute w-full h-[1px] bg-white/10 pointer-events-none" />
-          <div className="absolute h-full w-[1px] bg-white/10 pointer-events-none" />
-
-          {/* Thumb Knob */}
           <div
-            className={`w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-full shadow-lg border border-white/40 absolute flex items-center justify-center pointer-events-none transition-transform duration-75 ${
-              isDragging
-                ? 'bg-gradient-to-tr from-amber-500 to-amber-300 scale-105'
-                : 'bg-gradient-to-tr from-amber-600 to-amber-400'
-            }`}
-            style={{
-              transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
-            }}
+            ref={stickBaseRef}
+            onPointerDown={handleJoystickDown}
+            onPointerMove={handleJoystickMove}
+            onPointerUp={handleJoystickUp}
+            onPointerCancel={handleJoystickUp}
+            className="w-24 h-24 xs:w-28 xs:h-28 sm:w-32 sm:h-32 rounded-full bg-slate-950/80 border-2 border-amber-400/40 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-sm"
+            style={{ touchAction: 'none' }}
           >
-            <div className="w-3 h-3 xs:w-3.5 xs:h-3.5 rounded-full bg-amber-900/50 shadow-inner" />
+            {/* Directional cross guide */}
+            <div className="absolute w-16 h-16 xs:w-20 xs:h-20 rounded-full border border-white/10 pointer-events-none" />
+            <div className="absolute w-full h-[1px] bg-white/10 pointer-events-none" />
+            <div className="absolute h-full w-[1px] bg-white/10 pointer-events-none" />
+
+            {/* Thumb Knob */}
+            <div
+              className={`w-11 h-11 xs:w-12 xs:h-12 sm:w-14 sm:h-14 rounded-full shadow-lg border border-white/40 absolute flex items-center justify-center pointer-events-none transition-transform duration-75 ${
+                isDragging
+                  ? 'bg-gradient-to-tr from-amber-500 to-amber-300 scale-105'
+                  : 'bg-gradient-to-tr from-amber-600 to-amber-400'
+              }`}
+              style={{
+                transform: `translate(${knobPos.x}px, ${knobPos.y}px)`,
+              }}
+            >
+              <div className="w-3 h-3 xs:w-3.5 xs:h-3.5 rounded-full bg-amber-900/50 shadow-inner" />
+            </div>
+          </div>
+          <div className="text-center text-[9px] xs:text-[10px] uppercase font-black text-amber-300/80 tracking-widest mt-0.5">
+            Move
           </div>
         </div>
-        <div className="text-center text-[9px] xs:text-[10px] uppercase font-black text-amber-300/80 tracking-widest mt-0.5">
-          Move
-        </div>
-      </div>
+      )}
 
       {/* ======================================================== */}
       {/* 2. PROXIMITY INTERACT BUTTON                              */}
       {/* ======================================================== */}
-      {isInteractAvailable && (
+      {isInteractAvailable && intBtn.enabled !== false && (
         <div
           className="absolute pointer-events-auto transition-transform"
           style={{
@@ -300,81 +310,92 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
       {/* ======================================================== */}
       {/* 3. COMBAT CLUSTER (Tactical Strike, Dodge, Block)       */}
       {/* ======================================================== */}
-      <div
-        className="absolute pointer-events-auto flex items-center gap-2 xs:gap-2.5 transition-transform"
-        style={{
-          right: 'max(12px, env(safe-area-inset-right, 12px))',
-          bottom: `calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px + ${com.y}px)`,
-          transform: `translate(${-com.x}px, 0px) scale(${com.scale})`,
-          opacity: com.opacity,
-          transformOrigin: 'bottom right',
-        }}
-      >
-        {/* DODGE / EVADE Button */}
-        <button
-          onTouchStart={handleDodgePress}
-          onMouseDown={handleDodgePress}
-          className="w-11 h-11 xs:w-12 xs:h-12 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center bg-slate-900/90 text-amber-400 border border-amber-500/40 active:bg-amber-600 active:scale-95 cursor-pointer shadow-lg transition-all"
-          aria-label="Dodge"
+      {com.enabled !== false && (
+        <div
+          className="absolute pointer-events-auto flex items-center gap-2 xs:gap-2.5 transition-transform"
+          style={{
+            right: 'max(12px, env(safe-area-inset-right, 12px))',
+            bottom: `calc(max(12px, env(safe-area-inset-bottom, 12px)) + 84px + ${com.y}px)`,
+            transform: `translate(${-com.x}px, 0px) scale(${com.scale})`,
+            opacity: com.opacity,
+            transformOrigin: 'bottom right',
+          }}
         >
-          <Zap className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-amber-400" />
-          <span className="text-[7px] xs:text-[8px] font-black uppercase tracking-tight">Dodge</span>
-        </button>
+          {/* DODGE / EVADE Button */}
+          <button
+            onTouchStart={handleDodgePress}
+            onTouchEnd={handleDodgeEnd}
+            onTouchCancel={handleDodgeEnd}
+            onMouseDown={handleDodgePress}
+            onMouseUp={handleDodgeEnd}
+            onMouseLeave={handleDodgeEnd}
+            className="w-11 h-11 xs:w-12 xs:h-12 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center bg-slate-900/90 text-amber-400 border border-amber-500/40 active:bg-amber-600 active:scale-95 cursor-pointer shadow-lg transition-all"
+            aria-label="Dodge"
+          >
+            <Zap className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-amber-400" />
+            <span className="text-[7px] xs:text-[8px] font-black uppercase tracking-tight">Dodge</span>
+          </button>
 
-        {/* BLOCK / PARRY Button (Hold) */}
-        <button
-          onTouchStart={handleParryStart}
-          onTouchEnd={handleParryEnd}
-          onTouchCancel={handleParryEnd}
-          onMouseDown={handleParryStart}
-          onMouseUp={handleParryEnd}
-          onMouseLeave={handleParryEnd}
-          className="w-11 h-11 xs:w-12 xs:h-12 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center bg-slate-900/90 text-sky-400 border border-sky-400/40 active:bg-sky-600 active:scale-95 cursor-pointer shadow-lg transition-all"
-          aria-label="Block"
-        >
-          <Shield className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-sky-300" />
-          <span className="text-[7px] xs:text-[8px] font-black uppercase tracking-tight">Block</span>
-        </button>
+          {/* BLOCK / PARRY Button (Hold) */}
+          <button
+            onTouchStart={handleParryStart}
+            onTouchEnd={handleParryEnd}
+            onTouchCancel={handleParryEnd}
+            onMouseDown={handleParryStart}
+            onMouseUp={handleParryEnd}
+            onMouseLeave={handleParryEnd}
+            className="w-11 h-11 xs:w-12 xs:h-12 sm:w-13 sm:h-13 rounded-full flex flex-col items-center justify-center bg-slate-900/90 text-sky-400 border border-sky-400/40 active:bg-sky-600 active:scale-95 cursor-pointer shadow-lg transition-all"
+            aria-label="Block"
+          >
+            <Shield className="w-3.5 h-3.5 xs:w-4 xs:h-4 text-sky-300" />
+            <span className="text-[7px] xs:text-[8px] font-black uppercase tracking-tight">Block</span>
+          </button>
 
-        {/* PRIMARY ATTACK: Strike (Sword) or Fire (Firearm) */}
-        <button
-          onTouchStart={handleAttackPress}
-          onMouseDown={handleAttackPress}
-          className="w-14 h-14 xs:w-16 xs:h-16 sm:w-18 sm:h-18 rounded-full flex flex-col items-center justify-center bg-gradient-to-tr from-red-700 to-red-500 active:from-red-600 active:to-red-400 text-white shadow-2xl border-2 border-white/50 active:scale-95 transition-all cursor-pointer relative"
-          aria-label={(firearmAuthorized && ammoCount > 0) ? "Fire Weapon" : "Sword Strike"}
-        >
-          {(firearmAuthorized && ammoCount > 0) ? (
-            <>
-              <Crosshair className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 text-white drop-shadow-md" />
-              <span className="text-[8px] xs:text-[9px] font-black uppercase tracking-widest -mt-0.5">Fire</span>
-              {/* Ammo Count Indicator */}
-              <div className="absolute -top-1 -right-1 bg-slate-950 text-amber-400 text-[9px] xs:text-[10px] font-black px-1.5 py-0.5 rounded-lg border border-amber-500 shadow-lg">
-                {ammoCount}
-              </div>
-            </>
-          ) : (
-            <>
-              <Swords className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 text-white drop-shadow-md" />
-              <span className="text-[8px] xs:text-[9px] font-black uppercase tracking-widest -mt-0.5">Strike</span>
-            </>
-          )}
-        </button>
-      </div>
+          {/* PRIMARY ATTACK: Strike (Sword) or Fire (Firearm) */}
+          <button
+            onTouchStart={handleAttackPress}
+            onTouchEnd={handleAttackEnd}
+            onTouchCancel={handleAttackEnd}
+            onMouseDown={handleAttackPress}
+            onMouseUp={handleAttackEnd}
+            onMouseLeave={handleAttackEnd}
+            className="w-14 h-14 xs:w-16 xs:h-16 sm:w-18 sm:h-18 rounded-full flex flex-col items-center justify-center bg-gradient-to-tr from-red-700 to-red-500 active:from-red-600 active:to-red-400 text-white shadow-2xl border-2 border-white/50 active:scale-95 transition-all cursor-pointer relative"
+            aria-label={(firearmAuthorized && ammoCount > 0) ? "Fire Weapon" : "Sword Strike"}
+          >
+            {(firearmAuthorized && ammoCount > 0) ? (
+              <>
+                <Crosshair className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 text-white drop-shadow-md" />
+                <span className="text-[8px] xs:text-[9px] font-black uppercase tracking-widest -mt-0.5">Fire</span>
+                {/* Ammo Count Indicator */}
+                <div className="absolute -top-1 -right-1 bg-slate-950 text-amber-400 text-[9px] xs:text-[10px] font-black px-1.5 py-0.5 rounded-lg border border-amber-500 shadow-lg">
+                  {ammoCount}
+                </div>
+              </>
+            ) : (
+              <>
+                <Swords className="w-7 h-7 xs:w-8 xs:h-8 sm:w-9 sm:h-9 text-white drop-shadow-md" />
+                <span className="text-[8px] xs:text-[9px] font-black uppercase tracking-widest -mt-0.5">Strike</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* 4. ACTION BUTTONS CLUSTER (Jump, Run, Hide, Distract)   */}
       {/* Ergonomically clustered for right thumb sweep             */}
       {/* ======================================================== */}
-      <div
-        className="absolute pointer-events-auto flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 transition-transform"
-        style={{
-          right: 'max(12px, env(safe-area-inset-right, 12px))',
-          bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
-          transform: `translate(${-act.x}px, ${act.y}px) scale(${act.scale})`,
-          opacity: act.opacity,
-          transformOrigin: 'bottom right',
-        }}
-      >
+      {act.enabled !== false && (
+        <div
+          className="absolute pointer-events-auto flex items-center gap-1.5 xs:gap-2 sm:gap-2.5 transition-transform"
+          style={{
+            right: 'max(12px, env(safe-area-inset-right, 12px))',
+            bottom: 'max(12px, env(safe-area-inset-bottom, 12px))',
+            transform: `translate(${-act.x}px, ${act.y}px) scale(${act.scale})`,
+            opacity: act.opacity,
+            transformOrigin: 'bottom right',
+          }}
+        >
         {/* Stone Throw Distraction Button */}
         <button
           onTouchStart={handleDistractPress}
@@ -446,6 +467,7 @@ export const MobileControls: React.FC<MobileControlsProps> = ({
           <span className="text-[9px] xs:text-[10px] font-black uppercase tracking-wider -mt-0.5">Jump</span>
         </button>
       </div>
+      )}
     </div>
   );
 };

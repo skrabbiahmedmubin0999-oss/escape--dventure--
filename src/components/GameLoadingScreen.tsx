@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Compass, Eye, Shield, Swords, Sparkles, Zap, Crosshair } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { sound } from '../audio/soundSystem';
 
 interface GameLoadingScreenProps {
@@ -31,11 +32,11 @@ export const GameLoadingScreen: React.FC<GameLoadingScreenProps> = ({
   const [tipIndex, setTipIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
 
-  // Rotate tips every 2.5 seconds
+  // Rotate tips every 3 seconds
   useEffect(() => {
     const tipInterval = setInterval(() => {
       setTipIndex((prev) => (prev + 1) % TACTICAL_TIPS.length);
-    }, 2500);
+    }, 3000);
     return () => clearInterval(tipInterval);
   }, []);
 
@@ -43,7 +44,7 @@ export const GameLoadingScreen: React.FC<GameLoadingScreenProps> = ({
   useEffect(() => {
     let current = 0;
     const interval = setInterval(() => {
-      current += Math.random() * 18 + 8;
+      current += Math.random() * 15 + 5;
       if (current >= 100) {
         current = 100;
         setProgress(100);
@@ -52,7 +53,7 @@ export const GameLoadingScreen: React.FC<GameLoadingScreenProps> = ({
       } else {
         setProgress(Math.floor(current));
       }
-    }, 120);
+    }, 150);
 
     return () => clearInterval(interval);
   }, []);
@@ -63,107 +64,143 @@ export const GameLoadingScreen: React.FC<GameLoadingScreenProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col justify-between p-3 xs:p-4 sm:p-8 pt-[max(12px,env(safe-area-inset-top,12px))] pb-[max(12px,env(safe-area-inset-bottom,12px))] font-sans select-none overflow-hidden">
-      {/* Background Ambient Glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950 to-slate-950 pointer-events-none" />
+    <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col justify-between p-6 xs:p-8 sm:p-12 font-sans select-none overflow-hidden">
+      {/* Cinematic Background */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,_var(--tw-gradient-stops))] from-amber-500/10 via-slate-950 to-slate-950 pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-[0.03] pointer-events-none" />
 
-      {/* Top Bar: Explorer Identity */}
-      <div className="relative z-10 flex items-center justify-between w-full max-w-2xl mx-auto pt-2">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-lg">
-            <Compass className="w-5 h-5 animate-spin-slow" />
+      {/* Top Bar: Neural Link Identity */}
+      <motion.div 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative z-10 flex items-center justify-between w-full max-w-4xl mx-auto"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-amber-400/20 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.15)]">
+            <Compass className="w-7 h-7 animate-spin-slow" />
           </div>
           <div>
-            <div className="text-sm font-black text-white tracking-wide">{playerName}</div>
-            <div className="text-xs font-bold text-amber-400/90">{playerTitle}</div>
+            <div className="text-lg font-black text-white tracking-widest uppercase">{playerName}</div>
+            <div className="text-[10px] font-black text-amber-400/80 uppercase tracking-[0.3em]">{playerTitle}</div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono text-slate-300">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          <span>3D Engine Ready</span>
+        <div className="hidden sm:flex items-center gap-3 px-5 py-2 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+          <span className="text-[10px] font-mono font-black text-slate-300 uppercase tracking-widest">3D_ENGINE // STABLE</span>
         </div>
-      </div>
+      </motion.div>
 
       {/* Center Tactical Briefing Card */}
-      <div className="relative z-10 my-auto max-w-sm w-[95%] mx-auto bg-slate-900/90 border-2 border-amber-500/40 rounded-3xl p-3 sm:p-5 shadow-2xl space-y-3 text-left backdrop-blur-md">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-          <div className="flex items-center gap-1.5">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.2 }}
+        className="relative z-10 my-auto max-w-md landscape:max-w-xl w-full mx-auto bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-3 sm:space-y-4 text-center flex flex-col items-center justify-center max-h-[85dvh] overflow-y-auto custom-scrollbar"
+      >
+        <div className="flex items-center justify-between border-b border-white/5 pb-2.5 w-full">
+          <div className="flex items-center gap-2">
             <Swords className="w-4 h-4 text-amber-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400">Tactical Briefing</span>
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-amber-400">Deployment Briefing</span>
           </div>
-          <span className="text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded">
-            CLASSIFIED
-          </span>
+          <div className="px-2.5 py-0.5 rounded-lg bg-amber-400/10 border border-amber-400/20 text-[9px] font-mono font-black text-amber-400 tracking-widest">
+            LVL_AUTH_4
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <h1 className="text-base sm:text-lg font-black text-white uppercase tracking-tight leading-tight">
+        <div className="space-y-1 text-center">
+          <h1 className="text-lg sm:text-xl font-black text-white uppercase tracking-tight leading-none">
             {missionTitle}
           </h1>
-          <p className="text-[11px] sm:text-xs text-slate-300 font-medium leading-relaxed">
+          <p className="text-[11px] sm:text-xs text-slate-400 font-medium leading-relaxed max-w-md mx-auto">
             {missionDescription}
           </p>
         </div>
 
         {/* Feature Icons Row */}
-        <div className="grid grid-cols-3 gap-1.5 pt-1">
-          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2 text-center">
-            <Eye className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
-            <div className="text-[8px] font-bold text-slate-400 uppercase">Stealth</div>
-            <div className="text-[10px] font-black text-slate-200">Ghost</div>
-          </div>
-          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2 text-center">
-            <Shield className="w-3.5 h-3.5 text-sky-400 mx-auto mb-1" />
-            <div className="text-[8px] font-bold text-slate-400 uppercase">Defense</div>
-            <div className="text-[10px] font-black text-slate-200">Parry</div>
-          </div>
-          <div className="bg-slate-950/70 border border-slate-800 rounded-xl p-2 text-center">
-            <Crosshair className="w-3.5 h-3.5 text-red-400 mx-auto mb-1" />
-            <div className="text-[8px] font-bold text-slate-400 uppercase">Objective</div>
-            <div className="text-[10px] font-black text-slate-200">Portal</div>
-          </div>
+        <div className="grid grid-cols-3 gap-2 w-full">
+          {[
+            { icon: Eye, label: 'Infiltration', sub: 'Ghost', color: 'text-emerald-400' },
+            { icon: Shield, label: 'Tactical', sub: 'Parry', color: 'text-sky-400' },
+            { icon: Crosshair, label: 'Extraction', sub: 'Portal', color: 'text-red-400' },
+          ].map((item, i) => (
+            <div key={i} className="bg-black/20 border border-white/5 rounded-xl p-2 text-center group hover:border-white/10 transition-colors">
+              <item.icon className={`w-4 h-4 ${item.color} mx-auto mb-1 opacity-60 group-hover:opacity-100 transition-opacity`} />
+              <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{item.label}</div>
+              <div className="text-[9px] font-black text-slate-200 uppercase tracking-tight">{item.sub}</div>
+            </div>
+          ))}
         </div>
 
         {/* Rotating Tip Box */}
-        <div className="bg-slate-950/80 border border-amber-500/30 rounded-2xl p-3 space-y-1">
-          <div className="text-[9px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-            <Zap className="w-3 h-3" /> Field Advisor Tip
+        <div className="bg-black/40 border border-amber-400/20 rounded-xl p-3 relative overflow-hidden group w-full text-center">
+          <div className="text-[8px] font-black uppercase tracking-[0.25em] text-amber-400/80 mb-1 flex items-center justify-center gap-1.5">
+            <Zap className="w-3 h-3" /> Intelligence Feed
           </div>
-          <p className="text-[10px] text-slate-300 font-medium leading-normal min-h-[30px] transition-all duration-300">
-            "{TACTICAL_TIPS[tipIndex]}"
-          </p>
+          <AnimatePresence mode="wait">
+            <motion.p 
+              key={tipIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="text-[10px] sm:text-[11px] text-slate-300 font-medium leading-relaxed italic max-w-md mx-auto"
+            >
+              "{TACTICAL_TIPS[tipIndex]}"
+            </motion.p>
+          </AnimatePresence>
         </div>
 
         {/* Progress Bar & Start CTA */}
-        <div className="space-y-2 pt-1">
-          <div className="flex justify-between items-center text-[10px] font-mono font-bold text-slate-300">
-            <span>{isReady ? 'Infiltration Ready' : 'Compiling Shaders...'}</span>
-            <span className="text-amber-400">{progress}%</span>
+        <div className="space-y-2.5 pt-0.5 w-full">
+          <div className="flex justify-between items-center px-1">
+            <div className="flex items-center gap-2">
+              {!isReady && <div className="w-3 h-3 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />}
+              <span className="text-[9px] font-mono font-black text-slate-400 uppercase tracking-widest">
+                {isReady ? 'Neural Link Optimized' : 'Synthesizing Shaders'}
+              </span>
+            </div>
+            <span className="text-xs font-black font-mono text-amber-400 tabular-nums">{progress}%</span>
           </div>
 
-          <div className="w-full h-2.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-            <div
-              className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300 rounded-full transition-all duration-150 shadow-lg"
-              style={{ width: `${progress}%` }}
+          <div className="w-full h-1.5 bg-black/60 rounded-full overflow-hidden p-0.5 border border-white/5">
+            <motion.div
+              className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-300 rounded-full shadow-[0_0_15px_rgba(251,191,36,0.3)]"
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.1 }}
             />
           </div>
 
-          {isReady && (
-            <button
-              onClick={handleStart}
-              className="mt-2 w-full py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-xs uppercase tracking-widest shadow-2xl border-2 border-amber-200 transition-all transform hover:scale-[1.01] active:scale-95 cursor-pointer animate-pulse"
-            >
-              Deploy Now
-            </button>
-          )}
+          <AnimatePresence>
+            {isReady && (
+              <motion.button
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                onClick={handleStart}
+                className="w-full py-2.5 sm:py-3 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-[0.25em] shadow-[0_0_20px_rgba(251,191,36,0.3)] transition-all active:scale-95 cursor-pointer text-center"
+              >
+                Infiltrate Sector • অভিযান শুরু করুন
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* Footer hint */}
-      <div className="relative z-10 text-center text-[10px] font-mono text-slate-500 pb-2">
-        ESCAPE ADVENTURE • 3D ISLAND ENGINE • ALL SYSTEMS OPERATIONAL
-      </div>
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5 }}
+        className="relative z-10 text-center space-y-1 mx-auto"
+      >
+        <div className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-[0.4em]">
+          Link-OS // Island Node v4.8.2 // All Systems Nominal
+        </div>
+        <div className="text-[9px] font-medium text-slate-600 uppercase tracking-widest">
+          Proprietary Neural Interface • Mystery Island Sector
+        </div>
+      </motion.div>
     </div>
   );
 };
+

@@ -20,7 +20,7 @@ export default defineConfig(() => {
           theme_color: '#020617',
           background_color: '#020617',
           display: 'standalone',
-          orientation: 'any',
+          orientation: 'landscape',
           start_url: '/',
           scope: '/',
           categories: ['games', 'entertainment', 'adventure'],
