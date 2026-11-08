@@ -1,201 +1,168 @@
-import { Router, Request, Response } from 'express';
-import {
-  PlayerRecord,
-  ProfileRecord,
-  PlayerStatsRecord,
-  QuestProgressRecord,
-  InventoryItemRecord,
-  AchievementRecord,
-  SettingsRecord,
-} from './schema';
+import { Router, Request, Response, NextFunction } from 'express';
+import { createSessionToken, verifySessionToken } from './sessionToken';
+import { createGuestPlayer, getPlayerById, updateProfile, updateSettings, updateSave, deletePlayer } from './playerStore';
 
 export const apiRouter = Router();
-
-// In-Memory Data Store Mock Drivers (Phase 1 Backend Specification)
-const playersStore: Map<string, PlayerRecord> = new Map();
-const profilesStore: Map<string, ProfileRecord> = new Map();
-const statsStore: Map<string, PlayerStatsRecord> = new Map();
-const questProgressStore: Map<string, QuestProgressRecord> = new Map();
-const inventoryStore: Map<string, InventoryItemRecord[]> = new Map();
-const achievementsStore: Map<string, AchievementRecord[]> = new Map();
-const settingsStore: Map<string, SettingsRecord> = new Map();
-
-// Helper: Seed Default Player Session
-const DEFAULT_PLAYER_ID = 'p_explorer_guest_01';
-
-if (!playersStore.has(DEFAULT_PLAYER_ID)) {
-  const now = new Date().toISOString();
-  playersStore.set(DEFAULT_PLAYER_ID, {
-    id: DEFAULT_PLAYER_ID,
-    username: 'Alex The Explorer',
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  profilesStore.set(DEFAULT_PLAYER_ID, {
-    id: 'prof_01',
-    playerId: DEFAULT_PLAYER_ID,
-    name: 'Alex The Explorer',
-    title: 'Island Quest Pioneer',
-    tunicColor: '#e67e22',
-    hatColor: '#8e44ad',
-    updatedAt: now,
-  });
-
-  statsStore.set(DEFAULT_PLAYER_ID, {
-    id: 'stat_01',
-    playerId: DEFAULT_PLAYER_ID,
-    bestTime: null,
-    totalKeysCollected: 0,
-    gamesCompleted: 0,
-    puzzlesSolved: 0,
-    totalCoins: 0,
-    totalChests: 0,
-    xp: 0,
-    level: 1,
-    updatedAt: now,
-  });
-
-  questProgressStore.set(DEFAULT_PLAYER_ID, {
-    id: 'quest_01',
-    playerId: DEFAULT_PLAYER_ID,
-    currentMissionId: 'mission_shadow_escape',
-    keysCollectedSun: false,
-    keysCollectedOcean: false,
-    keysCollectedForest: false,
-    keysCount: 0,
-    altarActivated: false,
-    gateUnlocked: false,
-    gateOpening: false,
-    gateOpenProgress: 0,
-    timeElapsed: 0,
-    coinsCollected: 0,
-    chestsOpened: 0,
-    totalChests: 6,
-    xpEarned: 0,
-    puzzlesSolvedCount: 0,
-    crystalsCollected: 0,
-    checkpointsReached: 0,
-    survivalTimeRemaining: 240,
-    caughtCount: 0,
-    missionPhase: 'orient',
-    sessionSeed: 104729,
-    firearmAuthorized: false,
-    ammoCount: 0,
-    maxAmmo: 0,
-    playerHealth: 100,
-    maxPlayerHealth: 100,
-    updatedAt: now,
-  });
-
-  settingsStore.set(DEFAULT_PLAYER_ID, {
-    id: 'set_01',
-    playerId: DEFAULT_PLAYER_ID,
-    soundEnabled: true,
-    sfxVolume: 0.8,
-    musicVolume: 0.5,
-    graphicsQuality: 'high',
-    mouseSensitivity: 1.0,
-    joystickSensitivity: 1.0,
-    invertY: false,
-    showFps: false,
-    timeOfDay: 'day',
-    weather: 'clear',
-    autoDayNight: false,
-    updatedAt: now,
-  });
+const MAX_SAVE_BYTES = 200 * 1024;
+type Session = { playerId: string };
+function sessionOf(req: Request): Session | undefined { return (req as any).session as Session | undefined; }
+function getToken(req: Request): string | null {
+  const auth = req.headers.authorization;
+  if (typeof auth === 'string') {
+    const value = auth.trim();
+    return value.toLowerCase().startsWith('bearer ') ? value.slice(7).trim() : value;
+  }
+  const alternate = req.headers['x-session-token'];
+  return typeof alternate === 'string' ? alternate.trim() : null;
+}
+function requireSession(req: Request, res: Response, next: NextFunction): void {
+  const token = getToken(req);
+  const session = token ? verifySessionToken(token) : null;
+  if (!session) { res.status(401).json({ error: token ? 'Invalid or expired session' : 'Authentication required' }); return; }
+  (req as any).session = session;
+  next();
+}
+function canAccess(req: Request, res: Response, playerId: string): boolean {
+  const session = sessionOf(req);
+  if (!session) { res.status(401).json({ error: 'Authentication required' }); return false; }
+  if (session.playerId !== playerId) { res.status(403).json({ error: 'Player data access denied' }); return false; }
+  return true;
+}
+function safeString(value: unknown, max = 48): string | null {
+  if (typeof value !== 'string') return null;
+  const result = value.trim();
+  return result.length > 0 && result.length <= max && !/[\u0000-\u001f]/.test(result) ? result : null;
+}
+function color(value: unknown): string | undefined { return typeof value === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(value) ? value : undefined; }
+function validNumber(value: unknown, min: number, max: number): value is number { return typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max; }
+function validateSettings(input: unknown): Record<string, unknown> | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const src = input as Record<string, unknown>; const result: Record<string, unknown> = {};
+  const bools = ['soundEnabled', 'invertY', 'showFps', 'autoDayNight'];
+  for (const key of bools) if (key in src) { if (typeof src[key] !== 'boolean') return null; result[key] = src[key]; }
+  for (const key of ['sfxVolume', 'musicVolume']) if (key in src) { if (!validNumber(src[key], 0, 1)) return null; result[key] = src[key]; }
+  for (const key of ['mouseSensitivity', 'joystickSensitivity']) if (key in src) { if (!validNumber(src[key], 0.1, 3)) return null; result[key] = src[key]; }
+  if ('graphicsQuality' in src) { if (!['low', 'medium', 'high'].includes(String(src.graphicsQuality))) return null; result.graphicsQuality = src.graphicsQuality; }
+  for (const key of ['timeOfDay', 'weather']) if (key in src) { const text = safeString(src[key], 24); if (!text) return null; result[key] = text; }
+  return Object.keys(result).length ? result : null;
+}
+function validateSave(input: unknown): { payload?: any; error?: string } {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return { error: 'Save payload must be an object.' };
+  let encoded: string;
+  try { encoded = JSON.stringify(input); } catch { return { error: 'Invalid save payload.' }; }
+  if (Buffer.byteLength(encoded, 'utf8') > MAX_SAVE_BYTES) return { error: 'Save payload exceeds the maximum supported size.' };
+  const body = input as Record<string, unknown>;
+  if (!body.quest || typeof body.quest !== 'object' || Array.isArray(body.quest)) return { error: 'Save payload missing quest state.' };
+  if (!body.playerPos || typeof body.playerPos !== 'object' || Array.isArray(body.playerPos)) return { error: 'Save payload missing player position.' };
+  const pos = body.playerPos as Record<string, unknown>;
+  if (!['x', 'y', 'z'].every((axis) => validNumber(pos[axis], -1e6, 1e6))) return { error: 'Player position must contain finite x, y, and z values.' };
+  if (!validNumber(body.savedAt, 0, Number.MAX_SAFE_INTEGER)) return { error: 'Save payload missing valid savedAt timestamp.' };
+  return { payload: body };
+}
+function profileUpdate(req: Request, res: Response, playerId: string): void {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const patch: Record<string, string> = {};
+  for (const key of ['name', 'title'] as const) if (key in body) { const value = safeString(body[key]); if (!value) { res.status(400).json({ error: `Invalid ${key}.` }); return; } patch[key] = value; }
+  for (const key of ['tunicColor', 'hatColor'] as const) if (key in body) { const value = color(body[key]); if (!value) { res.status(400).json({ error: `Invalid ${key}.` }); return; } patch[key] = value; }
+  if (!Object.keys(patch).length) { res.status(400).json({ error: 'Profile update is empty or invalid.' }); return; }
+  const updated = updateProfile(playerId, patch);
+  if (!updated) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, profile: updated.profile });
+}
+function settingsUpdate(req: Request, res: Response, playerId: string): void {
+  const patch = validateSettings(req.body);
+  if (!patch) { res.status(400).json({ error: 'Settings update is empty or invalid.' }); return; }
+  const updated = updateSettings(playerId, patch);
+  if (!updated) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, settings: updated.settings });
 }
 
-// =======================================================
-// REST API ENDPOINTS (Phase 1 Architecture Specification)
-// =======================================================
-
-// Health Endpoint
-apiRouter.get('/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
-    system: 'Escape Adventure 3D API Server',
-    apiVersion: '1.0.0-phase1',
-    timestamp: new Date().toISOString(),
-  });
+apiRouter.get('/health', (_req, res) => res.json({ status: 'ok', system: 'Escape Adventure 3D API Server', apiVersion: '1.0.0-phase2', timestamp: new Date().toISOString() }));
+apiRouter.post('/auth/guest', (req, res) => {
+  const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {};
+  const name = body.displayName === undefined ? 'Explorer' : safeString(body.displayName);
+  if (!name) { res.status(400).json({ error: 'Invalid displayName.' }); return; }
+  try {
+    const player = createGuestPlayer(name); const token = createSessionToken(player.id);
+    res.status(201).json({ success: true, token, player: { id: player.id, username: player.username, displayName: player.profile.name, createdAt: player.createdAt } });
+  } catch { res.status(500).json({ error: 'Unable to create guest session' }); }
+});
+apiRouter.get('/players/me', requireSession, (req, res) => {
+  const player = getPlayerById(sessionOf(req)!.playerId);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, player: { id: player.id, username: player.username, createdAt: player.createdAt, updatedAt: player.updatedAt } });
+});
+apiRouter.get('/profiles/me', requireSession, (req, res) => {
+  const player = getPlayerById(sessionOf(req)!.playerId);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, profile: player.profile });
+});
+apiRouter.put('/profiles/me', requireSession, (req, res) => profileUpdate(req, res, sessionOf(req)!.playerId));
+apiRouter.get('/settings/me', requireSession, (req, res) => {
+  const player = getPlayerById(sessionOf(req)!.playerId);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, settings: player.settings });
+});
+apiRouter.put('/settings/me', requireSession, (req, res) => settingsUpdate(req, res, sessionOf(req)!.playerId));
+apiRouter.get('/saves/me', requireSession, (req, res) => {
+  const player = getPlayerById(sessionOf(req)!.playerId);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, save: player.save });
+});
+apiRouter.put('/saves/me', requireSession, (req, res) => {
+  const playerId = sessionOf(req)!.playerId; const validation = validateSave(req.body);
+  if (!validation.payload) { res.status(400).json({ error: validation.error }); return; }
+  const updated = updateSave(playerId, validation.payload);
+  if (!updated) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, save: updated.save, savedAt: updated.save?.savedAt });
+});
+apiRouter.delete('/players/me', requireSession, (req, res) => {
+  const playerId = sessionOf(req)!.playerId;
+  if (!deletePlayer(playerId)) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, deletedPlayerId: playerId });
 });
 
-// GET /api/v1/players/session - Register/Retrieve Guest Player
-apiRouter.get('/players/session', (_req: Request, res: Response) => {
-  const player = playersStore.get(DEFAULT_PLAYER_ID);
-  res.json({ success: true, player });
+// Compatibility routes remain authenticated and enforce ownership.
+apiRouter.get('/players/session', requireSession, (req, res) => {
+  const player = getPlayerById(sessionOf(req)!.playerId);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, player: { id: player.id, username: player.username, createdAt: player.createdAt } });
 });
-
-// GET /api/v1/players/:id/profile - Fetch Profile
-apiRouter.get('/players/:id/profile', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const profile = profilesStore.get(playerId) || profilesStore.get(DEFAULT_PLAYER_ID);
-  res.json({ success: true, profile });
+apiRouter.get('/players/:id/profile', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  const player = getPlayerById(req.params.id);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, profile: player.profile });
 });
-
-// PUT /api/v1/players/:id/profile - Update Profile
-apiRouter.put('/players/:id/profile', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const current = profilesStore.get(playerId) || {
-    id: `prof_${Date.now()}`,
-    playerId,
-    name: 'Alex The Explorer',
-    title: 'Island Quest Pioneer',
-    tunicColor: '#e67e22',
-    hatColor: '#8e44ad',
-    updatedAt: new Date().toISOString(),
-  };
-
-  const updated: ProfileRecord = {
-    ...current,
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  };
-
-  profilesStore.set(playerId, updated);
-  res.json({ success: true, profile: updated });
+apiRouter.put('/players/:id/profile', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  profileUpdate(req, res, req.params.id);
 });
-
-// GET /api/v1/players/:id/progress - Fetch Quest Progress
-apiRouter.get('/players/:id/progress', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const progress = questProgressStore.get(playerId) || questProgressStore.get(DEFAULT_PLAYER_ID);
-  res.json({ success: true, progress });
+apiRouter.get('/players/:id/settings', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  const player = getPlayerById(req.params.id);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, settings: player.settings });
 });
-
-// POST /api/v1/players/:id/progress/save - Save Quest Checkpoint Progress
-apiRouter.post('/players/:id/progress/save', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const current = questProgressStore.get(playerId) || questProgressStore.get(DEFAULT_PLAYER_ID)!;
-
-  const updated: QuestProgressRecord = {
-    ...current,
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  };
-
-  questProgressStore.set(playerId, updated);
-  res.json({ success: true, progress: updated, savedAt: updated.updatedAt });
+apiRouter.put('/players/:id/settings', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  settingsUpdate(req, res, req.params.id);
 });
-
-// GET /api/v1/players/:id/settings - Fetch Settings
-apiRouter.get('/players/:id/settings', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const settings = settingsStore.get(playerId) || settingsStore.get(DEFAULT_PLAYER_ID);
-  res.json({ success: true, settings });
+apiRouter.get('/players/:id/progress', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  const player = getPlayerById(req.params.id);
+  if (!player) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, progress: player.save?.quest ?? null });
 });
-
-// PUT /api/v1/players/:id/settings - Update Settings
-apiRouter.put('/players/:id/settings', (req: Request, res: Response) => {
-  const playerId = req.params.id || DEFAULT_PLAYER_ID;
-  const current = settingsStore.get(playerId) || settingsStore.get(DEFAULT_PLAYER_ID)!;
-
-  const updated: SettingsRecord = {
-    ...current,
-    ...req.body,
-    updatedAt: new Date().toISOString(),
-  };
-
-  settingsStore.set(playerId, updated);
-  res.json({ success: true, settings: updated });
+apiRouter.post('/players/:id/progress/save', requireSession, (req, res) => {
+  if (!canAccess(req, res, req.params.id)) return;
+  const validation = validateSave(req.body);
+  if (!validation.payload) { res.status(400).json({ error: validation.error }); return; }
+  const updated = updateSave(req.params.id, validation.payload);
+  if (!updated) { res.status(404).json({ error: 'Player not found' }); return; }
+  res.json({ success: true, progress: updated.save?.quest ?? null, savedAt: updated.save?.savedAt });
+});
+apiRouter.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) { res.status(400).json({ error: 'Malformed JSON body.' }); return; }
+  res.status(err?.type === 'entity.too.large' ? 413 : 500).json({ error: err?.type === 'entity.too.large' ? 'Request body too large.' : 'Internal server error' });
 });
